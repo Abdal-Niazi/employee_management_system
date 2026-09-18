@@ -3,12 +3,12 @@ const cors = require("cors");
 require("dotenv").config();
 
 const prisma = require("./src/utils/prisma");
-
+const employeeRoutes = require("./src/routes/employeeRoutes");
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
+app.use("/api/employees", employeeRoutes);
 app.get("/", (req, res) => {
   res.json({
     message: "Employee Management System API is running",
