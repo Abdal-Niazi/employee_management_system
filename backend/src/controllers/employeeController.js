@@ -17,6 +17,24 @@ const createEmployee = async (req, res) => {
   }
 };
 
+const getEmployees = async (req, res) => {
+  try {
+    const employees = await employeeService.getEmployees();
+
+    res.status(200).json({
+      message: "Employees retrieved successfully",
+      employees,
+    });
+  } catch (error) {
+    console.error("Get employees error:", error);
+
+    res.status(500).json({
+      message: "Failed to retrieve employees",
+    });
+  }
+};
+
 module.exports = {
   createEmployee,
+  getEmployees,
 };
