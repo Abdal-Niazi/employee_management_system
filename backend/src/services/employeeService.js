@@ -8,6 +8,17 @@ const createEmployee = async (employeeData) => {
   return employee;
 };
 
+const getEmployees = async () => {
+  const employees = await prisma.employee.findMany({
+    orderBy: {
+      id: "asc",
+    },
+  });
+
+  return employees;
+};
+
 module.exports = {
   createEmployee,
+  getEmployees,
 };
