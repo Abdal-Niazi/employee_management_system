@@ -115,16 +115,21 @@ function seedLeave(team) {
   }
 }
 
+// Pending first (soonest leave first), then decided (most recent decision first).
+function compareLeave(a, b) {
+  const aPending = a.status === "PENDING";
+  const bPending = b.status === "PENDING";
+  if (aPending !== bPending) return aPending ? -1 : 1;
+  if (aPending) return a.startDate.localeCompare(b.startDate);
+  return b.decidedAt.localeCompare(a.decidedAt);
+}
+
 export function listLeave(team, status) {
   seedLeave(team);
   const ids = new Set(team.map((e) => e.employeeId));
   return leaveRequests
     .filter((r) => ids.has(r.employeeId) && (!status || r.status === status))
-    .sort((a, b) =>
-      a.status === "PENDING" && b.status === "PENDING"
-        ? a.startDate.localeCompare(b.startDate)
-        : (b.decidedAt ?? b.requestedAt).localeCompare(a.decidedAt ?? a.requestedAt)
-    )
+    .sort(compareLeave)
     .map((r) => ({ ...r }));
 }
 
