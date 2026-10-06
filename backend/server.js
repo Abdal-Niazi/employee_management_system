@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const prisma = require("./src/utils/prisma");
 const employeeRoutes = require("./src/routes/employeeRoutes");
+const { notFound, errorHandler } = require("./src/middleware/errorHandler");
 const app = express();
 
 app.use(cors());
@@ -30,6 +31,9 @@ app.get("/test-db", async (req, res) => {
     });
   }
 });
+
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 

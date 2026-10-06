@@ -1,37 +1,23 @@
 const employeeService = require("../services/employeeService");
 
+// Express 5 forwards rejected promises to the error handler,
+// so these handlers don't need their own try/catch.
 const createEmployee = async (req, res) => {
-  try {
-    const employee = await employeeService.createEmployee(req.body);
+  const employee = await employeeService.createEmployee(req.body);
 
-    res.status(201).json({
-      message: "Employee created successfully",
-      employee,
-    });
-  } catch (error) {
-    console.error("Create employee error:", error);
-
-    res.status(500).json({
-      message: "Failed to create employee",
-    });
-  }
+  res.status(201).json({
+    message: "Employee created successfully",
+    employee,
+  });
 };
 
 const getEmployees = async (req, res) => {
-  try {
-    const employees = await employeeService.getEmployees();
+  const employees = await employeeService.getEmployees();
 
-    res.status(200).json({
-      message: "Employees retrieved successfully",
-      employees,
-    });
-  } catch (error) {
-    console.error("Get employees error:", error);
-
-    res.status(500).json({
-      message: "Failed to retrieve employees",
-    });
-  }
+  res.status(200).json({
+    message: "Employees retrieved successfully",
+    employees,
+  });
 };
 
 module.exports = {
