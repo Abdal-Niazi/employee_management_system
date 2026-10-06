@@ -1,34 +1,83 @@
 // Creates an HR admin account. Run from backend: npm run create-admin
 require("dotenv").config({ quiet: true });
 
-const readline = require("node:readline");
 const prisma = require("../src/utils/prisma");
 const authService = require("../src/services/authService");
 const { createAdminSchema } = require("../src/validators/authSchema");
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: Boolean(process.stdin.isTTY),
+// Input is read straight from stdin rather than through readline, whose line
+// redrawing garbles prompts in some Windows terminals. Normal answers use the
+// terminal's own line editing; the password switches to raw mode so each key
+// can be shown as "*". Piped input (one answer per line) also works.
+let pending = "";
+let inputEnded = false;
+let skipNextNewline = false;
+let onInput = null;
+
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  pending += chunk;
+  onInput?.();
+});
+process.stdin.on("end", () => {
+  inputEnded = true;
+  onInput?.();
 });
 
-// Hide the password while it's typed
-let muted = false;
-const writeToOutput = rl._writeToOutput.bind(rl);
-rl._writeToOutput = (text) => {
-  if (!muted) writeToOutput(text);
-};
+const ask = (question, { hidden = false } = {}) =>
+  new Promise((resolve) => {
+    const masked = hidden && process.stdin.isTTY;
+    let answer = "";
 
-const lines = rl[Symbol.asyncIterator]();
+    const finish = () => {
+      onInput = null;
+      process.stdin.pause();
+      if (masked) {
+        process.stdin.setRawMode(false);
+        process.stdout.write("\n");
+      }
+      resolve(answer);
+    };
 
-const ask = async (question, { hidden = false } = {}) => {
-  process.stdout.write(question);
-  muted = hidden;
-  const { value = "" } = await lines.next();
-  muted = false;
-  if (hidden) process.stdout.write("\n");
-  return value;
-};
+    onInput = () => {
+      for (const char of pending) {
+        pending = pending.slice(char.length);
+
+        if (char === "\n" && skipNextNewline) {
+          skipNextNewline = false;
+          continue;
+        }
+        skipNextNewline = char === "\r";
+
+        if (char === "\r" || char === "\n") return finish();
+
+        if (char === "\u0003") {
+          // Ctrl+C arrives as a character in raw mode
+          process.stdin.setRawMode(false);
+          process.stdout.write("\nCancelled\n");
+          process.exit(130);
+        }
+
+        if (char === "\b" || char === "\u007f") {
+          if (answer.length > 0) {
+            answer = answer.slice(0, -1);
+            if (masked) process.stdout.write("\b \b");
+          }
+          continue;
+        }
+
+        answer += char;
+        if (masked) process.stdout.write("*");
+      }
+
+      if (inputEnded) finish();
+    };
+
+    process.stdout.write(question);
+    if (masked) process.stdin.setRawMode(true);
+    process.stdin.resume();
+    onInput();
+  });
 
 const main = async () => {
   const input = {
@@ -66,6 +115,5 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    rl.close();
     await prisma.$disconnect();
   });
