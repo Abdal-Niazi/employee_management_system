@@ -37,6 +37,11 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Prisma "record not found" on update or delete
+  if (err.code === "P2025") {
+    return res.status(404).json({ message: "Employee not found" });
+  }
+
   // Everything else: log it here, send nothing internal to the client
   console.error("Unhandled error:", err);
   return res.status(500).json({ message: "Internal server error" });

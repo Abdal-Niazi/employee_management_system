@@ -27,4 +27,11 @@ const createEmployeeSchema = z.object({
     .optional(),
 });
 
-module.exports = { createEmployeeSchema };
+// Any subset of the create fields, but at least one of them.
+const updateEmployeeSchema = createEmployeeSchema
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, {
+    error: "No valid fields provided to update",
+  });
+
+module.exports = { createEmployeeSchema, updateEmployeeSchema };
