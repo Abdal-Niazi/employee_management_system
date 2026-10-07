@@ -71,14 +71,18 @@ export default function TeamScreen() {
             />
           </View>
           <Text style={font.small}>
-            {members.length} of {data.length} members · all employees are shown until teams are linked to managers
+            {members.length} of {data.length} team members
           </Text>
         </View>
       }
       ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
       ListEmptyComponent={
         data.length === 0 ? (
-          <EmptyState icon="people-outline" title="No team members yet" message="Employees added by HR will appear here." />
+          <EmptyState
+            icon="people-outline"
+            title="No team members yet"
+            message="Employees whose manager is you will appear here."
+          />
         ) : (
           <EmptyState icon="search" title="No matches" message={`Nothing matches “${query}”.`} />
         )

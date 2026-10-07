@@ -1,23 +1,34 @@
 import { todayKey } from "../utils/date";
-import { ApiError } from "./client";
-import { getEmployees } from "./employees";
+import { ApiError, request } from "./client";
 import * as mock from "./mock";
 
 // Everything the manager screens need. Team data is real; attendance and leave
 // are sample data (see mock.js) until the backend endpoints noted below exist.
 
-// Real. Employee has no manager link yet, so the team is every employee.
-// Later: GET /api/manager/team
-export function getTeam() {
-  return getEmployees();
+// Manager accounts don't exist yet, so an admin login views the team of the
+// employee set in mobile/.env. Once managers can sign in, the backend uses the
+// signed-in manager and this setting goes away.
+function managerQuery() {
+  const managerId = process.env.EXPO_PUBLIC_MANAGER_ID;
+  if (!managerId) {
+    throw new ApiError(
+      "Set EXPO_PUBLIC_MANAGER_ID in mobile/.env to the id of the manager whose team you want to see.",
+      0
+    );
+  }
+  return `?managerId=${encodeURIComponent(managerId)}`;
 }
 
-// Real. Later: GET /api/manager/team/:id
+// Real: GET /api/manager/team
+export async function getTeam() {
+  const { team } = await request(`/api/manager/team${managerQuery()}`);
+  return team;
+}
+
+// Real: GET /api/manager/team/:id
 export async function getTeamMember(id) {
-  const team = await getTeam();
-  const member = team.find((e) => String(e.id) === String(id));
-  if (!member) throw new ApiError("Team member not found", 404);
-  return member;
+  const { employee } = await request(`/api/manager/team/${encodeURIComponent(id)}${managerQuery()}`);
+  return employee;
 }
 
 // Sample. Later: GET /api/manager/attendance?date=YYYY-MM-DD

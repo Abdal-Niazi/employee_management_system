@@ -26,6 +26,18 @@ EXPO_PUBLIC_API_URL=http://192.168.1.20:5000
 
 The phone and computer must be on the same Wi-Fi, and Windows Firewall must allow port 5000.
 
+### Which manager's team you see
+
+Managers can't sign in yet, so the app shows the team of the employee set in `mobile/.env`
+(their database `id`, not their employee code):
+
+```
+EXPO_PUBLIC_MANAGER_ID=4
+```
+
+An employee's manager is set by HR with `PATCH /api/employees/:id` and `{ "managerId": 4 }`
+(`null` removes it). Restart with `npx expo start --clear` after changing `.env`.
+
 ## Sign in
 
 Sign-in uses the backend (`POST /api/auth/login`), and the returned token is sent as
@@ -39,7 +51,7 @@ manager app. HR Admin and Employee show a placeholder (those screens live on `fe
 
 | Screen | Data | Backend endpoint that will replace the sample |
 |---|---|---|
-| My Team, member details | **Real** — `GET /api/employees` (all employees until `Employee` has a manager link) | `GET /api/manager/team` |
+| My Team, member details | **Real** — `GET /api/manager/team`, `GET /api/manager/team/:id` (employees whose `managerId` is the manager) | — |
 | Attendance (team, member last 7 days) | Sample | `GET /api/manager/attendance?date=YYYY-MM-DD` |
 | Leave approvals, leave history | Sample (approve/reject kept in memory) | `GET /api/manager/leave-requests`, `PATCH /api/manager/leave-requests/:id` |
 | Overview | Team size real, the rest sample | — |
@@ -55,7 +67,7 @@ src/app/            screens (Expo Router — every file is a route)
   (manager)/        bottom tabs: Overview, My Team, Attendance, Leave
   member/[id].js    team member details
   coming-soon.js    HR Admin / Employee placeholder
-src/api/            client.js (fetch wrapper + token), auth.js, employees.js, manager.js, mock.js
+src/api/            client.js (fetch wrapper + token), auth.js, manager.js, mock.js
 src/components/     shared UI
 src/auth/           session: user + token in memory (expo-secure-store later)
 ```
