@@ -5,7 +5,9 @@ It talks to the Express API in `../backend`; it never connects to PostgreSQL dir
 
 ## Run it
 
-Start PostgreSQL and the backend first (`node server.js` in `../backend`, port 5000). Then:
+Start PostgreSQL and the backend first. Once, in `../backend`: add `JWT_SECRET` to `.env` (any long
+random string), run `npm install` and `npx prisma migrate deploy`, and create an account with
+`npm run create-admin`. Then start it with `node server.js` (port 5000). Then, here:
 
 ```bash
 npm install
@@ -26,9 +28,12 @@ The phone and computer must be on the same Wi-Fi, and Windows Firewall must allo
 
 ## Sign in
 
-The backend has no login endpoint yet, so sign-in is a demo: pick a role, any email works,
-and the password is not checked or sent. **Manager** opens the manager app; HR Admin and
-Employee show a placeholder (those screens are built on `feature/hr-admin` / `feature/employee`).
+Sign-in uses the backend (`POST /api/auth/login`), and the returned token is sent as
+`Authorization: Bearer <token>` with every request. The backend only has HR admin accounts and no
+roles yet, so sign in with an admin account and pick **Manager** under "Sign in as" to open the
+manager app. HR Admin and Employee show a placeholder (those screens live on `feature/hr-admin` /
+`feature/employee`). The token is kept in memory: reloading the app, or the token expiring
+(after 8 hours), signs you out.
 
 ## What is real and what is sample data
 
@@ -46,11 +51,11 @@ Screens with sample data show a yellow **Sample data** badge. All data access go
 
 ```
 src/app/            screens (Expo Router — every file is a route)
-  login.js          demo sign-in
+  login.js          sign-in against the backend
   (manager)/        bottom tabs: Overview, My Team, Attendance, Leave
   member/[id].js    team member details
   coming-soon.js    HR Admin / Employee placeholder
-src/api/            client.js (fetch wrapper), employees.js, manager.js, mock.js
+src/api/            client.js (fetch wrapper + token), auth.js, employees.js, manager.js, mock.js
 src/components/     shared UI
-src/auth/           demo session (replace with JWT + expo-secure-store)
+src/auth/           session: user + token in memory (expo-secure-store later)
 ```

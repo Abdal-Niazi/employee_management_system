@@ -50,7 +50,7 @@ export default function OverviewScreen() {
     >
       <View>
         <Text style={font.small}>{formatDay(todayKey())}</Text>
-        <Text style={font.title}>Welcome back, {user.email.split("@")[0]}</Text>
+        <Text style={font.title}>Welcome back, {user.name || user.email.split("@")[0]}</Text>
       </View>
 
       <View style={styles.stats}>

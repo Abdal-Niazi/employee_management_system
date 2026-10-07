@@ -15,14 +15,26 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("manager");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       setError("Enter a valid email address.");
       return;
     }
-    // The password is intentionally unused until POST /api/auth/login exists.
-    login({ email: email.trim(), role });
+    if (!password) {
+      setError("Enter your password.");
+      return;
+    }
+    setError("");
+    setSubmitting(true);
+    try {
+      await login({ email: email.trim(), password, role });
+      // On success this screen closes, so there's nothing left to reset.
+    } catch (e) {
+      setError(e.message);
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -41,7 +53,8 @@ export default function LoginScreen() {
             <View style={styles.notice}>
               <Ionicons name="information-circle-outline" size={18} color={colors.info} />
               <Text style={styles.noticeText}>
-                Demo sign-in: the backend has no login yet, so the password isn&apos;t checked or sent anywhere.
+                The server has no manager accounts yet. Sign in with an HR admin account and pick Manager to see the
+                manager screens.
               </Text>
             </View>
 
@@ -57,16 +70,24 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
+              editable={!submitting}
               style={styles.input}
             />
 
             <Text style={styles.label}>Password</Text>
             <TextInput
               value={password}
-              onChangeText={setPassword}
-              placeholder="Not checked yet"
+              onChangeText={(text) => {
+                setPassword(text);
+                setError("");
+              }}
+              placeholder="Your password"
               placeholderTextColor={colors.muted}
               secureTextEntry
+              autoComplete="password"
+              returnKeyType="go"
+              onSubmitEditing={handleSignIn}
+              editable={!submitting}
               style={styles.input}
             />
 
@@ -75,7 +96,7 @@ export default function LoginScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Button title="Sign in" onPress={handleSignIn} style={styles.submit} />
+            <Button title="Sign in" onPress={handleSignIn} loading={submitting} style={styles.submit} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

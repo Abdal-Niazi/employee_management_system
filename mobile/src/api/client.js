@@ -5,6 +5,19 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000
 // A wrong IP or a firewall block can otherwise leave a screen spinning for minutes.
 const TIMEOUT_MS = 10_000;
 
+// Set by AuthContext after login and sent as a Bearer token with every request.
+let authToken = null;
+let onUnauthorized = null;
+
+export function setAuthToken(token) {
+  authToken = token;
+}
+
+// Called when the server rejects the current token (e.g. it expired), so the app can sign out.
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler;
+}
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -15,8 +28,12 @@ export class ApiError extends Error {
 export async function request(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  // Only send a JSON content type with a body — on GETs it just forces a CORS preflight.
-  const headers = options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers;
+  const sentToken = authToken;
+  const headers = {
+    ...(options.body && { "Content-Type": "application/json" }),
+    ...(sentToken && { Authorization: `Bearer ${sentToken}` }),
+    ...options.headers,
+  };
 
   let response;
   try {
@@ -36,6 +53,8 @@ export async function request(path, options = {}) {
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // Only for the token still in use: a late 401 from before a new login must not sign that login out.
+    if (response.status === 401 && sentToken && sentToken === authToken) onUnauthorized?.();
     throw new ApiError(body.message || `Request failed (${response.status})`, response.status);
   }
 
