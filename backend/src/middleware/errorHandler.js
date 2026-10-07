@@ -37,6 +37,11 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Prisma foreign key violation (managerId pointing at an employee that doesn't exist)
+  if (err.code === "P2003") {
+    return res.status(400).json({ message: "managerId does not match an existing employee" });
+  }
+
   // Prisma "record not found" on update or delete
   if (err.code === "P2025") {
     return res.status(404).json({ message: "Employee not found" });

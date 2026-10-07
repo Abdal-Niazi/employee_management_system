@@ -25,6 +25,12 @@ const createEmployeeSchema = z.object({
       error: "status must be one of: active, inactive, terminated",
     })
     .optional(),
+  // The employee's manager; null removes the link.
+  managerId: z
+    .number({ error: "managerId must be a number" })
+    .int("managerId must be a positive integer")
+    .positive("managerId must be a positive integer")
+    .nullish(),
 });
 
 // Any subset of the create fields, but at least one of them.

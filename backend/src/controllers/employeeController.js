@@ -48,7 +48,13 @@ const getEmployeeById = async (req, res) => {
 };
 
 const updateEmployee = async (req, res) => {
-  const employee = await employeeService.updateEmployee(parseId(req.params.id), req.body);
+  const id = parseId(req.params.id);
+
+  if (req.body.managerId === id) {
+    throw new AppError("An employee can't be their own manager", 400);
+  }
+
+  const employee = await employeeService.updateEmployee(id, req.body);
 
   res.status(200).json({
     message: "Employee updated successfully",

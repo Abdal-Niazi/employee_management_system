@@ -19,6 +19,13 @@ model Employee {
   status     String   @default("active")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  // The employee's manager (also an employee). Deleting a manager unlinks their team.
+  managerId Int?
+  manager   Employee?  @relation("ManagerReports", fields: [managerId], references: [id], onDelete: SetNull)
+  reports   Employee[] @relation("ManagerReports")
+
+  @@index([managerId])
 }
 
 model Admin {

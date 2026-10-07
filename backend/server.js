@@ -10,6 +10,7 @@ if (!process.env.JWT_SECRET) {
 const prisma = require("./src/utils/prisma");
 const authRoutes = require("./src/routes/authRoutes");
 const employeeRoutes = require("./src/routes/employeeRoutes");
+const managerRoutes = require("./src/routes/managerRoutes");
 const { notFound, errorHandler } = require("./src/middleware/errorHandler");
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/manager", managerRoutes);
 app.get("/", (req, res) => {
   res.json({
     message: "Employee Management System API is running",
