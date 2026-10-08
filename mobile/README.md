@@ -7,7 +7,8 @@ It talks to the Express API in `../backend`; it never connects to PostgreSQL dir
 
 Start PostgreSQL and the backend first. Once, in `../backend`: add `JWT_SECRET` to `.env` (any long
 random string), run `npm install` and `npx prisma migrate deploy`, and create an account with
-`npm run create-admin`. Then start it with `node server.js` (port 5000). Then, here:
+`npm run create-admin`. For sample leave requests, run `npm run seed` (safe to repeat: people who
+already have requests are skipped). Then start it with `node server.js` (port 5000). Then, here:
 
 ```bash
 npm install
@@ -52,9 +53,9 @@ manager app. HR Admin and Employee show a placeholder (those screens live on `fe
 | Screen | Data | Backend endpoint that will replace the sample |
 |---|---|---|
 | My Team, member details | **Real** — `GET /api/manager/team`, `GET /api/manager/team/:id` (employees whose `managerId` is the manager) | — |
-| Attendance (team, member last 7 days) | Sample | `GET /api/manager/attendance?date=YYYY-MM-DD` |
-| Leave approvals, leave history | Sample (approve/reject kept in memory) | `GET /api/manager/leave-requests`, `PATCH /api/manager/leave-requests/:id` |
-| Overview | Team size real, the rest sample | — |
+| Leave approvals, leave history | **Real** — `GET /api/manager/leave-requests?status=`, `GET /api/manager/team/:id/leave-requests`, `PATCH /api/manager/leave-requests/:id` | — |
+| Attendance (team, member last 7 days) | Sample, but real approved leave shows as "On leave" | `GET /api/manager/attendance?date=YYYY-MM-DD` |
+| Overview | Team size and pending leave real, attendance sample | — |
 
 Screens with sample data show a yellow **Sample data** badge. All data access goes through
 `src/api/manager.js` — swap a function's body for a `request()` call when its endpoint exists.

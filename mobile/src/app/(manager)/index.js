@@ -64,7 +64,7 @@ export default function OverviewScreen() {
         <Stat icon="alarm-outline" label="Late today" value={counts.LATE} onPress={() => router.navigate("/attendance")} />
         <Stat icon="hourglass-outline" label="Pending leave" value={pending.length} onPress={() => router.navigate("/leave")} />
       </View>
-      <SampleDataBadge label="Attendance and leave are sample data" />
+      <SampleDataBadge label="Attendance is sample data" />
 
       <Card title="Today's attendance">
         {isDayOff ? (
