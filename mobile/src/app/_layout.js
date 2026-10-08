@@ -6,8 +6,12 @@ import { colors } from "../theme";
 // Each role only gets its own screens. When a guard turns false (sign in/out),
 // Expo Router moves to the first screen that is still available.
 function RootNavigator() {
-  const { user } = useAuth();
-  const isManager = user?.role === "manager";
+  const { user, restoring } = useAuth();
+  // HR admins are the only real accounts for now, so they see the team screens too.
+  const isManager = user?.role === "manager" || user?.role === "hr_admin";
+
+  // Don't flash the login screen while a saved session is being checked.
+  if (restoring) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
