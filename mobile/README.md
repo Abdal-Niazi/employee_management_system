@@ -26,9 +26,10 @@ The phone and computer must be on the same Wi-Fi, and Windows Firewall must allo
 
 ## Sign in
 
-The backend has no login endpoint yet, so sign-in is a demo: pick a role, any email works,
-and the password is not checked or sent. **Manager** opens the manager app; HR Admin and
-Employee show a placeholder (those screens are built on `feature/hr-admin` / `feature/employee`).
+Sign-in calls `POST /api/auth/login`, and the server says which role the account has
+(`HR_ADMIN` or `MANAGER`; create accounts with `npm run create-admin` in `backend/`). Managers see
+the manager screens; for now HR admins see them too, since their own screens are not built yet. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
+out) and sent as a Bearer token. A 401 signs you out.
 
 ## What is real and what is sample data
 
@@ -46,11 +47,11 @@ Screens with sample data show a yellow **Sample data** badge. All data access go
 
 ```
 src/app/            screens (Expo Router — every file is a route)
-  login.js          demo sign-in
+  login.js          email + password sign-in
   (manager)/        bottom tabs: Overview, My Team, Attendance, Leave
   member/[id].js    team member details
-  coming-soon.js    HR Admin / Employee placeholder
-src/api/            client.js (fetch wrapper), employees.js, manager.js, mock.js
+  coming-soon.js    placeholder for roles without screens yet
+src/api/            client.js (fetch wrapper + Bearer token), auth.js, employees.js, manager.js, mock.js
 src/components/     shared UI
-src/auth/           demo session (replace with JWT + expo-secure-store)
+src/auth/           session (AuthContext) and token storage
 ```

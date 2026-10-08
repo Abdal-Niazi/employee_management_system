@@ -1,4 +1,4 @@
-// Creates an HR admin account. Run from backend: npm run create-admin
+// Creates an HR admin or manager account. Run from backend: npm run create-admin
 require("dotenv").config({ quiet: true });
 
 const prisma = require("../src/utils/prisma");
@@ -83,6 +83,7 @@ const main = async () => {
   const input = {
     email: await ask("Email: "),
     name: await ask("Name: "),
+    role: (await ask("Role (HR_ADMIN or MANAGER) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
     password: await ask("Password (min 8 characters): ", { hidden: true }),
   };
 
@@ -94,19 +95,19 @@ const main = async () => {
     return;
   }
 
-  const { email, name, password } = result.data;
+  const { email, name, role, password } = result.data;
 
   if (await prisma.admin.findUnique({ where: { email } })) {
-    console.error(`An admin with email ${email} already exists`);
+    console.error(`An account with email ${email} already exists`);
     process.exitCode = 1;
     return;
   }
 
   const admin = await prisma.admin.create({
-    data: { email, name, passwordHash: await authService.hashPassword(password) },
+    data: { email, name, role, passwordHash: await authService.hashPassword(password) },
   });
 
-  console.log(`Admin created: ${admin.email} (id ${admin.id})`);
+  console.log(`${admin.role} created: ${admin.email} (id ${admin.id})`);
 };
 
 main()

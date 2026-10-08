@@ -2,27 +2,34 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ROLES, useAuth } from "../auth/AuthContext";
+import { useAuth } from "../auth/AuthContext";
 import Button from "../components/Button";
-import SegmentedControl from "../components/SegmentedControl";
 import { colors, font, radius, spacing } from "../theme";
-
-const ROLE_OPTIONS = Object.entries(ROLES).map(([value, label]) => ({ value, label }));
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("manager");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       setError("Enter a valid email address.");
       return;
     }
-    // The password is intentionally unused until POST /api/auth/login exists.
-    login({ email: email.trim(), role });
+    if (!password) {
+      setError("Enter your password.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await login(email.trim(), password);
+    } catch (err) {
+      setError(err.message);
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -38,13 +45,6 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.card}>
-            <View style={styles.notice}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.info} />
-              <Text style={styles.noticeText}>
-                Demo sign-in: the backend has no login yet, so the password isn&apos;t checked or sent anywhere.
-              </Text>
-            </View>
-
             <Text style={styles.label}>Email</Text>
             <TextInput
               value={email}
@@ -63,19 +63,20 @@ export default function LoginScreen() {
             <Text style={styles.label}>Password</Text>
             <TextInput
               value={password}
-              onChangeText={setPassword}
-              placeholder="Not checked yet"
+              onChangeText={(text) => {
+                setPassword(text);
+                setError("");
+              }}
+              onSubmitEditing={handleSignIn}
+              placeholder="Your password"
               placeholderTextColor={colors.muted}
               secureTextEntry
               style={styles.input}
             />
 
-            <Text style={styles.label}>Sign in as</Text>
-            <SegmentedControl options={ROLE_OPTIONS} value={role} onChange={setRole} />
-
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Button title="Sign in" onPress={handleSignIn} style={styles.submit} />
+            <Button title="Sign in" onPress={handleSignIn} loading={submitting} style={styles.submit} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -107,15 +108,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.xl,
   },
-  notice: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    backgroundColor: colors.infoSoft,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  noticeText: { flex: 1, fontSize: 13, color: colors.text },
   label: { fontSize: 14, fontWeight: "600", color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
   input: {
     borderWidth: 1,

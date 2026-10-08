@@ -12,11 +12,28 @@ export class ApiError extends Error {
   }
 }
 
+// AuthContext owns the session; it hands the token (and a sign-out callback for
+// expired tokens) to this module so every request can send the Bearer header.
+let authToken = null;
+let onUnauthorized = null;
+
+export function setAuthToken(token) {
+  authToken = token;
+}
+
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler;
+}
+
 export async function request(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   // Only send a JSON content type with a body — on GETs it just forces a CORS preflight.
-  const headers = options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers;
+  const headers = {
+    ...(options.body ? { "Content-Type": "application/json" } : null),
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : null),
+    ...options.headers,
+  };
 
   let response;
   try {
@@ -36,6 +53,8 @@ export async function request(path, options = {}) {
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // A 401 while holding a token means it expired or was revoked — sign out.
+    if (response.status === 401 && authToken) onUnauthorized?.();
     throw new ApiError(body.message || `Request failed (${response.status})`, response.status);
   }
 
