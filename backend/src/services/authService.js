@@ -9,7 +9,7 @@ const BCRYPT_ROUNDS = 12;
 // as long as a wrong password and doesn't reveal which emails are admins.
 const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", BCRYPT_ROUNDS);
 
-const toPublicAdmin = ({ id, email, name }) => ({ id, email, name });
+const toPublicAdmin = ({ id, email, name, role }) => ({ id, email, name, role });
 
 const hashPassword = (password) => bcrypt.hash(password, BCRYPT_ROUNDS);
 
