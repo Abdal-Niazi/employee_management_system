@@ -25,7 +25,31 @@ model Employee {
   manager   Employee?  @relation("ManagerReports", fields: [managerId], references: [id], onDelete: SetNull)
   reports   Employee[] @relation("ManagerReports")
 
+  leaveRequests  LeaveRequest[] @relation("EmployeeLeave")
+  leaveDecisions LeaveRequest[] @relation("LeaveDecider")
+
   @@index([managerId])
+}
+
+model LeaveRequest {
+  id           Int       @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee  @relation("EmployeeLeave", fields: [employeeId], references: [id], onDelete: Cascade)
+  type         String // Annual, Sick, Casual
+  startDate    DateTime  @db.Date
+  endDate      DateTime  @db.Date
+  days         Int // working days
+  reason       String?
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  decidedAt    DateTime?
+  // The manager (an employee) who approved or rejected it
+  decidedById  Int?
+  decidedBy    Employee? @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decisionNote String?
+  createdAt    DateTime  @default(now()) // when it was requested
+  updatedAt    DateTime  @updatedAt
+
+  @@index([employeeId, status])
 }
 
 model Admin {
