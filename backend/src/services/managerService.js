@@ -97,9 +97,10 @@ const decideLeave = async (managerId, id, { status, note }) => {
     throw new AppError("Leave request not found", 404);
   }
 
-  // Only a still-pending request changes, so two decisions can't both win.
+  // Only a still-pending request in this team changes, checked in the same
+  // statement as the update, so two decisions can't both win.
   const { count } = await prisma.leaveRequest.updateMany({
-    where: { id, status: "PENDING" },
+    where: { id, status: "PENDING", employee: { managerId } },
     data: { status, decidedAt: new Date(), decidedById: managerId, decisionNote: note || null },
   });
 

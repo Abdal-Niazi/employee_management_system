@@ -3,18 +3,13 @@ const AppError = require("../utils/AppError");
 const parseId = require("../utils/parseId");
 const { LEAVE_STATUSES } = require("../validators/managerSchema");
 
-// Only HR admins can log in so far, so the caller says whose team they want
-// with ?managerId=<employee id>. Once manager accounts exist, a signed-in
-// manager's own employee id replaces this (and only admins may pass managerId).
+// The manager is always the signed-in MANAGER account's own employee, never a
+// value from the request, so nobody can open another manager's team.
 const resolveManager = async (req) => {
-  if (req.query.managerId === undefined) {
-    throw new AppError("managerId is required until manager accounts exist", 400);
-  }
-
-  const manager = await managerService.getManager(parseId(req.query.managerId, "managerId"));
+  const manager = req.admin.employeeId ? await managerService.getManager(req.admin.employeeId) : null;
 
   if (!manager) {
-    throw new AppError("Manager not found", 404);
+    throw new AppError("This manager account isn't linked to an employee", 403);
   }
 
   return manager;

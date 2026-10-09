@@ -28,6 +28,9 @@ model Employee {
   leaveRequests  LeaveRequest[] @relation("EmployeeLeave")
   leaveDecisions LeaveRequest[] @relation("LeaveDecider")
 
+  // The login account of this employee, if they have one (managers do)
+  account Admin? @relation("AdminEmployee")
+
   @@index([managerId])
 }
 
@@ -64,6 +67,9 @@ model Admin {
   name         String
   passwordHash String
   role         Role     @default(HR_ADMIN)
+  // For MANAGER accounts: the employee they are, whose team they manage
+  employeeId   Int?      @unique
+  employee     Employee? @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
