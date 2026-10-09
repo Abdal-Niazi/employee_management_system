@@ -1,4 +1,5 @@
-require("dotenv").config({ quiet: true });
+// backend/.env, wherever the server is started from
+require("dotenv").config({ path: require("path").join(__dirname, ".env"), quiet: true });
 
 // Refuse to start with settings that would make the API unsafe or broken.
 const configErrors = [];
