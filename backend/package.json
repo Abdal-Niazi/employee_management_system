@@ -1,12 +1,17 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Employee Management System API (Express + Prisma + PostgreSQL)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
+    "start": "node server.js",
+    "migrate:deploy": "prisma migrate deploy",
     "create-admin": "node scripts/createAdmin.js",
     "seed": "node scripts/seed.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node scripts/test.js",
     "postinstall": "prisma skills sync || exit 0"
   },
   "keywords": [],
@@ -19,11 +24,14 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "prisma": "^7.10.0"
+    "prisma": "^7.10.0",
+    "supertest": "^7.3.1"
   }
 }

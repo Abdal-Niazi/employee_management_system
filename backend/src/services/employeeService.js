@@ -8,14 +8,20 @@ const createEmployee = async (employeeData) => {
   return employee;
 };
 
-const getEmployees = async () => {
-  const employees = await prisma.employee.findMany({
-    orderBy: {
-      id: "asc",
-    },
-  });
+// One page of employees plus the total count.
+const getEmployees = async ({ page, pageSize }) => {
+  const [employees, total] = await prisma.$transaction([
+    prisma.employee.findMany({
+      orderBy: {
+        id: "asc",
+      },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.employee.count(),
+  ]);
 
-  return employees;
+  return { employees, total };
 };
 
 const getEmployeeById = async (id) => {

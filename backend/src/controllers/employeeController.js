@@ -1,17 +1,16 @@
 const employeeService = require("../services/employeeService");
 const AppError = require("../utils/AppError");
+const parseIdValue = require("../utils/parseId");
 
-// Largest value a Postgres Int column can hold
-const MAX_INT = 2147483647;
+const parseId = (value) => parseIdValue(value, "Employee id");
 
-const parseId = (value) => {
-  const id = Number(value);
+// ?page=&pageSize= on the list; a page is never bigger than MAX_PAGE_SIZE.
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
-  if (!Number.isInteger(id) || id < 1 || id > MAX_INT) {
-    throw new AppError("Employee id must be a positive integer", 400);
-  }
-
-  return id;
+const parsePage = (value, fallback, label) => {
+  if (value === undefined) return fallback;
+  return parseIdValue(value, label);
 };
 
 // Express 5 forwards rejected promises to the error handler,
@@ -26,11 +25,19 @@ const createEmployee = async (req, res) => {
 };
 
 const getEmployees = async (req, res) => {
-  const employees = await employeeService.getEmployees();
+  const page = parsePage(req.query.page, 1, "page");
+  const pageSize = parsePage(req.query.pageSize, DEFAULT_PAGE_SIZE, "pageSize");
+
+  if (pageSize > MAX_PAGE_SIZE) {
+    throw new AppError(`pageSize must be at most ${MAX_PAGE_SIZE}`, 400);
+  }
+
+  const { employees, total } = await employeeService.getEmployees({ page, pageSize });
 
   res.status(200).json({
     message: "Employees retrieved successfully",
     employees,
+    pagination: { page, pageSize, total },
   });
 };
 
