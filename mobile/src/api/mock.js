@@ -1,9 +1,8 @@
-import { addDays, fromDateKey, isWeekend, todayKey } from "../utils/date";
-import { fullName } from "../utils/status";
+import { addDays, isWeekend, todayKey } from "../utils/date";
 
-// Sample attendance and leave data for the manager screens. The backend has no
-// Attendance or LeaveRequest models yet, so records are generated from the real
-// team list (names line up) and leave decisions live in memory for the session.
+// Sample attendance for the manager screens. The backend has no Attendance model
+// yet, so records are generated from the real team list (names line up). People on
+// real approved leave (passed in from the backend) show as "On leave".
 
 export const SHIFT = { name: "General", start: "09:00", end: "17:00" };
 
@@ -27,126 +26,9 @@ function hash(text) {
 
 const pad = (n) => String(n).padStart(2, "0");
 const toTime = (minutes) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
-const dayToIso = (key) => fromDateKey(key).toISOString();
 
-// ---------- Leave requests ----------
-
-const LEAVE_TYPES = ["Annual", "Sick", "Casual"];
-const REASONS = {
-  Annual: ["Family trip", "Visiting relatives", "Wedding in the family"],
-  Sick: ["Fever and flu", "Medical appointment", "Recovering from a minor procedure"],
-  Casual: ["Personal errand", "Moving house", "Bank and paperwork"],
-};
-
-const leaveRequests = [];
-const seeded = new Set();
-
-function nextWeekday(key) {
-  let day = key;
-  while (isWeekend(day)) day = addDays(day, 1);
-  return day;
-}
-
-// Last day of a leave that covers `days` working days starting on `start`.
-function endAfterWorkingDays(start, days) {
-  let end = start;
-  for (let left = days - 1; left > 0; left--) end = nextWeekday(addDays(end, 1));
-  return end;
-}
-
-function makeRequest(employee, n, { startOffset, days, status, requestedOffset }) {
-  const h = hash(`${employee.employeeId}#${n}`);
-  const type = LEAVE_TYPES[h % LEAVE_TYPES.length];
-  const today = todayKey();
-  const startDate = nextWeekday(addDays(today, startOffset));
-  const hired = employee.hireDate.slice(0, 10);
-  const requested = addDays(today, requestedOffset);
-  const requestedKey = requested < hired ? hired : requested;
-  return {
-    id: `LR-${employee.employeeId}-${n}`,
-    employeeId: employee.employeeId,
-    employeeDbId: employee.id,
-    employeeName: fullName(employee),
-    department: employee.department,
-    type,
-    startDate,
-    endDate: endAfterWorkingDays(startDate, days),
-    days,
-    reason: REASONS[type][h % REASONS[type].length],
-    status,
-    requestedAt: dayToIso(requestedKey),
-    decidedAt: status === "PENDING" ? null : dayToIso(addDays(requestedKey, 1)),
-    decisionNote: status === "REJECTED" ? "Overlaps with a release week" : null,
-  };
-}
-
-function seedLeave(team) {
-  for (const employee of team) {
-    if (seeded.has(employee.employeeId)) continue;
-    seeded.add(employee.employeeId);
-    const h = hash(employee.employeeId);
-    leaveRequests.push(
-      makeRequest(employee, 1, {
-        startOffset: 3 + (h % 10),
-        days: 1 + (h % 3),
-        status: "PENDING",
-        requestedOffset: -1 - (h % 3),
-      })
-    );
-
-    // A past, already-decided request — only if the employee was hired by then.
-    const pastRequestedOffset = -40 - (h % 10);
-    if (addDays(todayKey(), pastRequestedOffset) >= employee.hireDate.slice(0, 10)) {
-      leaveRequests.push(
-        makeRequest(employee, 2, {
-          startOffset: -25 - (h % 20),
-          days: 1 + ((h >>> 4) % 2),
-          status: (h >>> 1) % 2 === 0 ? "APPROVED" : "REJECTED",
-          requestedOffset: pastRequestedOffset,
-        })
-      );
-    }
-
-    if ((h >>> 2) % 2 === 0) {
-      leaveRequests.push(
-        makeRequest(employee, 3, { startOffset: 1, days: 1, status: "PENDING", requestedOffset: 0 })
-      );
-    }
-  }
-}
-
-// Pending first (soonest leave first), then decided (most recent decision first).
-function compareLeave(a, b) {
-  const aPending = a.status === "PENDING";
-  const bPending = b.status === "PENDING";
-  if (aPending !== bPending) return aPending ? -1 : 1;
-  if (aPending) return a.startDate.localeCompare(b.startDate);
-  return b.decidedAt.localeCompare(a.decidedAt);
-}
-
-export function listLeave(team, status) {
-  seedLeave(team);
-  const ids = new Set(team.map((e) => e.employeeId));
-  return leaveRequests
-    .filter((r) => ids.has(r.employeeId) && (!status || r.status === status))
-    .sort(compareLeave)
-    .map((r) => ({ ...r }));
-}
-
-export function decideLeave(id, decision, note) {
-  const request = leaveRequests.find((r) => r.id === id);
-  if (!request) throw new Error("Leave request not found");
-  if (request.status !== "PENDING") throw new Error("This request has already been decided");
-  Object.assign(request, {
-    status: decision,
-    decidedAt: new Date().toISOString(),
-    decisionNote: note?.trim() || null,
-  });
-  return { ...request };
-}
-
-function onApprovedLeave(employeeId, dateKey) {
-  return leaveRequests.some(
+function onApprovedLeave(approvedLeave, employeeId, dateKey) {
+  return approvedLeave.some(
     (r) =>
       r.employeeId === employeeId &&
       r.status === "APPROVED" &&
@@ -155,13 +37,11 @@ function onApprovedLeave(employeeId, dateKey) {
   );
 }
 
-// ---------- Attendance ----------
-
-export function attendanceFor(employee, dateKey) {
+export function attendanceFor(employee, dateKey, approvedLeave = []) {
   const base = { employeeId: employee.employeeId, date: dateKey, shift: SHIFT, checkIn: null, checkOut: null };
 
   if (isWeekend(dateKey) || dateKey < employee.hireDate.slice(0, 10)) return { ...base, status: "OFF" };
-  if (onApprovedLeave(employee.employeeId, dateKey)) return { ...base, status: "ON_LEAVE" };
+  if (onApprovedLeave(approvedLeave, employee.employeeId, dateKey)) return { ...base, status: "ON_LEAVE" };
 
   const roll = hash(`${employee.employeeId}|${dateKey}`) % 100;
   const isToday = dateKey === todayKey();
@@ -184,15 +64,13 @@ export function attendanceFor(employee, dateKey) {
   return { ...base, status, checkIn: toTime(checkIn), checkOut: toTime(checkOut) };
 }
 
-export function teamAttendance(team, dateKey) {
-  seedLeave(team);
-  return team.map((employee) => ({ employee, record: attendanceFor(employee, dateKey) }));
+export function teamAttendance(team, dateKey, approvedLeave = []) {
+  return team.map((employee) => ({ employee, record: attendanceFor(employee, dateKey, approvedLeave) }));
 }
 
-export function memberAttendance(employee, days) {
-  seedLeave([employee]);
+export function memberAttendance(employee, days, approvedLeave = []) {
   const today = todayKey();
-  return Array.from({ length: days }, (_, i) => attendanceFor(employee, addDays(today, -i)));
+  return Array.from({ length: days }, (_, i) => attendanceFor(employee, addDays(today, -i), approvedLeave));
 }
 
 export function summarize(records) {

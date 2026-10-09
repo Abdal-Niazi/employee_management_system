@@ -1,66 +1,78 @@
 import { todayKey } from "../utils/date";
-import { ApiError } from "./client";
-import { getEmployees } from "./employees";
+import { request } from "./client";
 import * as mock from "./mock";
 
-// Everything the manager screens need. Team data is real; attendance and leave
-// are sample data (see mock.js) until the backend endpoints noted below exist.
+// Everything the manager screens need. Team and leave data are real; attendance
+// is sample data (see mock.js) until GET /api/manager/attendance exists.
+// The backend works out whose team it is from the signed-in manager account.
 
-// Real. Employee has no manager link yet, so the team is every employee.
-// Later: GET /api/manager/team
-export function getTeam() {
-  return getEmployees();
+function managerUrl(path, params = {}) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join("&");
+  return query ? `${path}?${query}` : path;
 }
 
-// Real. Later: GET /api/manager/team/:id
+// Real: GET /api/manager/team
+export async function getTeam() {
+  const { team } = await request(managerUrl("/api/manager/team"));
+  return team;
+}
+
+// Real: GET /api/manager/team/:id
 export async function getTeamMember(id) {
-  const team = await getTeam();
-  const member = team.find((e) => String(e.id) === String(id));
-  if (!member) throw new ApiError("Team member not found", 404);
-  return member;
+  const { employee } = await request(managerUrl(`/api/manager/team/${encodeURIComponent(id)}`));
+  return employee;
 }
 
-// Sample. Later: GET /api/manager/attendance?date=YYYY-MM-DD
+// Real: GET /api/manager/leave-requests?status=PENDING (no status = all)
+export async function getLeaveRequests(status) {
+  const { leaveRequests } = await request(managerUrl("/api/manager/leave-requests", { status }));
+  return leaveRequests;
+}
+
+// Real: GET /api/manager/team/:id/leave-requests
+export async function getMemberLeave(member) {
+  const { leaveRequests } = await request(managerUrl(`/api/manager/team/${encodeURIComponent(member.id)}/leave-requests`));
+  return leaveRequests;
+}
+
+// Real: PATCH /api/manager/leave-requests/:id  { status, note }
+export async function decideLeave(id, decision, note) {
+  const { leaveRequest } = await request(managerUrl(`/api/manager/leave-requests/${encodeURIComponent(id)}`), {
+    method: "PATCH",
+    body: JSON.stringify({ status: decision, note: note?.trim() || null }),
+  });
+  return leaveRequest;
+}
+
+const approvedOnly = (leave) => leave.filter((r) => r.status === "APPROVED");
+
+// Sample, but people on real approved leave show as "On leave".
+// Later: GET /api/manager/attendance?date=YYYY-MM-DD
 export async function getTeamAttendance(dateKey) {
-  const team = await getTeam();
+  const [team, approved] = await Promise.all([getTeam(), getLeaveRequests("APPROVED")]);
   await mock.delay();
-  const rows = mock.teamAttendance(team, dateKey);
+  const rows = mock.teamAttendance(team, dateKey, approved);
   return { rows, counts: mock.summarize(rows.map((r) => r.record)) };
 }
 
-// Sample. Later: GET /api/manager/team/:id/attendance?days=7
-export async function getMemberAttendance(member, days = 7) {
+// Sample. `leave` is the member's real leave history (from getMemberLeave).
+// Later: GET /api/manager/team/:id/attendance?days=7
+export async function getMemberAttendance(member, days = 7, leave = []) {
   await mock.delay();
-  return mock.memberAttendance(member, days);
+  return mock.memberAttendance(member, days, approvedOnly(leave));
 }
 
-// Sample. Later: GET /api/manager/leave-requests?status=PENDING
-export async function getLeaveRequests(status) {
-  const team = await getTeam();
-  await mock.delay();
-  return mock.listLeave(team, status);
-}
-
-// Sample. Later: GET /api/manager/team/:id/leave-requests
-export async function getMemberLeave(member) {
-  await mock.delay();
-  return mock.listLeave([member]);
-}
-
-// Sample. Later: PATCH /api/manager/leave-requests/:id  { status, note }
-export async function decideLeave(id, decision, note) {
-  await mock.delay();
-  return mock.decideLeave(id, decision, note);
-}
-
-// Team size is real; today's attendance and pending leave are sample.
+// Team size and pending leave are real; today's attendance is sample.
 export async function getOverview() {
-  const team = await getTeam();
+  const [team, leave] = await Promise.all([getTeam(), getLeaveRequests()]);
   await mock.delay();
-  const today = mock.teamAttendance(team, todayKey());
+  const today = mock.teamAttendance(team, todayKey(), approvedOnly(leave));
   return {
     teamSize: team.length,
     counts: mock.summarize(today.map((r) => r.record)),
-    pending: mock.listLeave(team, "PENDING"),
+    pending: leave.filter((r) => r.status === "PENDING"),
   };
 }

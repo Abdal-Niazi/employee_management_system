@@ -5,6 +5,10 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000
 // A wrong IP or a firewall block can otherwise leave a screen spinning for minutes.
 const TIMEOUT_MS = 10_000;
 
+// Release builds only talk to an HTTPS API, so passwords and tokens are never sent in
+// plain text. Plain http is fine while developing on a local network.
+const INSECURE_API = !__DEV__ && !API_URL.startsWith("https://");
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -26,12 +30,17 @@ export function setUnauthorizedHandler(handler) {
 }
 
 export async function request(path, options = {}) {
+  if (INSECURE_API) {
+    throw new ApiError("This build needs an https:// API address (EXPO_PUBLIC_API_URL).", 0);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const sentToken = authToken;
   // Only send a JSON content type with a body — on GETs it just forces a CORS preflight.
   const headers = {
     ...(options.body ? { "Content-Type": "application/json" } : null),
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : null),
+    ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : null),
     ...options.headers,
   };
 
@@ -53,8 +62,9 @@ export async function request(path, options = {}) {
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    // A 401 while holding a token means it expired or was revoked — sign out.
-    if (response.status === 401 && authToken) onUnauthorized?.();
+    // A 401 for the token still in use means it expired or was revoked — sign out. A late 401
+    // from a request sent before a new login must not sign that new login out.
+    if (response.status === 401 && sentToken && sentToken === authToken) onUnauthorized?.();
     throw new ApiError(body.message || `Request failed (${response.status})`, response.status);
   }
 

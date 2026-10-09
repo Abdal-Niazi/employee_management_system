@@ -19,6 +19,40 @@ model Employee {
   status     String   @default("active")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  // The employee's manager (also an employee). Deleting a manager unlinks their team.
+  managerId Int?
+  manager   Employee?  @relation("ManagerReports", fields: [managerId], references: [id], onDelete: SetNull)
+  reports   Employee[] @relation("ManagerReports")
+
+  leaveRequests  LeaveRequest[] @relation("EmployeeLeave")
+  leaveDecisions LeaveRequest[] @relation("LeaveDecider")
+
+  // The login account of this employee, if they have one (managers do)
+  account Admin? @relation("AdminEmployee")
+
+  @@index([managerId])
+}
+
+model LeaveRequest {
+  id           Int       @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee  @relation("EmployeeLeave", fields: [employeeId], references: [id], onDelete: Cascade)
+  type         String // Annual, Sick, Casual
+  startDate    DateTime  @db.Date
+  endDate      DateTime  @db.Date
+  days         Int // working days
+  reason       String?
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  decidedAt    DateTime?
+  // The manager (an employee) who approved or rejected it
+  decidedById  Int?
+  decidedBy    Employee? @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decisionNote String?
+  createdAt    DateTime  @default(now()) // when it was requested
+  updatedAt    DateTime  @updatedAt
+
+  @@index([employeeId, status])
 }
 
 enum Role {
@@ -33,6 +67,9 @@ model Admin {
   name         String
   passwordHash String
   role         Role     @default(HR_ADMIN)
+  // For MANAGER accounts: the employee they are, whose team they manage
+  employeeId   Int?      @unique
+  employee     Employee? @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

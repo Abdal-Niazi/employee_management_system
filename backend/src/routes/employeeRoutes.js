@@ -7,21 +7,18 @@ const { createEmployeeSchema, updateEmployeeSchema } = require("../validators/em
 
 const router = express.Router();
 
-// Every employee route requires a logged-in account. Managers can only read;
-// HR admins can also create, update and delete.
-router.use(requireAuth);
+// HR admins only. Managers see just their own team, through /api/manager, so they
+// can't read every employee's personal details.
+router.use(requireAuth, requireRole("HR_ADMIN"));
 
-const hrAdminOnly = requireRole("HR_ADMIN");
-const hrAdminOrManager = requireRole("HR_ADMIN", "MANAGER");
+router.post("/", validate(createEmployeeSchema), employeeController.createEmployee);
 
-router.post("/", hrAdminOnly, validate(createEmployeeSchema), employeeController.createEmployee);
+router.get("/", employeeController.getEmployees);
 
-router.get("/", hrAdminOrManager, employeeController.getEmployees);
+router.get("/:id", employeeController.getEmployeeById);
 
-router.get("/:id", hrAdminOrManager, employeeController.getEmployeeById);
+router.patch("/:id", validate(updateEmployeeSchema), employeeController.updateEmployee);
 
-router.patch("/:id", hrAdminOnly, validate(updateEmployeeSchema), employeeController.updateEmployee);
-
-router.delete("/:id", hrAdminOnly, employeeController.deleteEmployee);
+router.delete("/:id", employeeController.deleteEmployee);
 
 module.exports = router;

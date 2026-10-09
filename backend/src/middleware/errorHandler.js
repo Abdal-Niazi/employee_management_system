@@ -30,6 +30,16 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ message: "Invalid JSON in request body" });
   }
 
+  // Request body over the 100 kB limit
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({ message: "Request body is too large" });
+  }
+
+  // Other client errors from the body parser (bad encoding, unsupported charset, ...)
+  if (err.expose && err.status >= 400 && err.status < 500) {
+    return res.status(err.status).json({ message: err.message });
+  }
+
   // Prisma unique constraint violation (duplicate employeeId or email)
   if (err.code === "P2002") {
     return res.status(409).json({
@@ -37,9 +47,14 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Prisma foreign key violation (e.g. a managerId that matches no employee)
+  if (err.code === "P2003") {
+    return res.status(400).json({ message: "A linked record does not exist" });
+  }
+
   // Prisma "record not found" on update or delete
   if (err.code === "P2025") {
-    return res.status(404).json({ message: "Employee not found" });
+    return res.status(404).json({ message: `${err.meta?.modelName ?? "Record"} not found` });
   }
 
   // Everything else: log it here, send nothing internal to the client

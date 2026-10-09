@@ -84,8 +84,15 @@ const main = async () => {
     email: await ask("Email: "),
     name: await ask("Name: "),
     role: (await ask("Role (HR_ADMIN or MANAGER) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
-    password: await ask("Password (min 8 characters): ", { hidden: true }),
   };
+
+  // A manager account belongs to one employee: the person whose team it manages.
+  if (input.role === "MANAGER") {
+    const answer = (await ask("Employee database id of this manager: ")).trim();
+    input.employeeId = answer === "" ? null : Number(answer);
+  }
+
+  input.password = await ask("Password (min 8 characters): ", { hidden: true });
 
   const result = createAdminSchema.safeParse(input);
 
@@ -95,7 +102,7 @@ const main = async () => {
     return;
   }
 
-  const { email, name, role, password } = result.data;
+  const { email, name, role, employeeId, password } = result.data;
 
   if (await prisma.admin.findUnique({ where: { email } })) {
     console.error(`An account with email ${email} already exists`);
@@ -103,11 +110,28 @@ const main = async () => {
     return;
   }
 
+  if (employeeId) {
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId }, include: { account: true } });
+
+    if (!employee) {
+      console.error(`No employee has id ${employeeId}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (employee.account) {
+      console.error(`Employee ${employeeId} already has an account (${employee.account.email})`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   const admin = await prisma.admin.create({
-    data: { email, name, role, passwordHash: await authService.hashPassword(password) },
+    data: { email, name, role, employeeId: employeeId ?? null, passwordHash: await authService.hashPassword(password) },
   });
 
-  console.log(`${admin.role} created: ${admin.email} (id ${admin.id})`);
+  const linked = admin.employeeId ? `, employee ${admin.employeeId}` : "";
+  console.log(`${admin.role} created: ${admin.email} (id ${admin.id}${linked})`);
 };
 
 main()

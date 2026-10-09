@@ -4,7 +4,6 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { decideLeave, getLeaveRequests } from "../../api/manager";
 import DecisionModal from "../../components/DecisionModal";
 import LeaveCard from "../../components/LeaveCard";
-import SampleDataBadge from "../../components/SampleDataBadge";
 import SegmentedControl from "../../components/SegmentedControl";
 import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import { useAsync } from "../../hooks/useAsync";
@@ -86,7 +85,6 @@ export default function LeaveScreen() {
     <View style={styles.screen}>
       <View style={styles.toolbar}>
         <SegmentedControl options={FILTERS} value={filter} onChange={setFilter} />
-        <SampleDataBadge />
         {toast && (
           <View style={[styles.toast, toast.status === "REJECTED" && styles.toastDanger]} accessibilityLiveRegion="polite">
             <Ionicons

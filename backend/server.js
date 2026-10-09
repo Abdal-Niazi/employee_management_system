@@ -1,49 +1,37 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+// backend/.env, wherever the server is started from
+require("dotenv").config({ path: require("path").join(__dirname, ".env"), quiet: true });
 
-if (!process.env.JWT_SECRET) {
-  console.error("JWT_SECRET is not set. Add it to backend/.env before starting the server.");
+// Refuse to start with settings that would make the API unsafe or broken.
+const configErrors = [];
+if (!process.env.DATABASE_URL) configErrors.push("DATABASE_URL is not set.");
+if (!process.env.JWT_SECRET) configErrors.push("JWT_SECRET is not set.");
+else if (process.env.JWT_SECRET.length < 32) configErrors.push("JWT_SECRET must be at least 32 characters long.");
+
+if (configErrors.length > 0) {
+  configErrors.forEach((message) => console.error(message));
+  console.error("Fix backend/.env (see .env.example) and start the server again.");
   process.exit(1);
 }
 
+const app = require("./src/app");
 const prisma = require("./src/utils/prisma");
-const authRoutes = require("./src/routes/authRoutes");
-const employeeRoutes = require("./src/routes/employeeRoutes");
-const { notFound, errorHandler } = require("./src/middleware/errorHandler");
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-app.use("/api/auth", authRoutes);
-app.use("/api/employees", employeeRoutes);
-app.get("/", (req, res) => {
-  res.json({
-    message: "Employee Management System API is running",
-  });
-});
-
-app.get("/test-db", async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-
-    res.json({
-      message: "Database connection successful",
-    });
-  } catch (error) {
-    console.error("Database connection error:", error);
-
-    res.status(500).json({
-      message: "Database connection failed",
-    });
-  }
-});
-
-app.use(notFound);
-app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Finish in-flight requests and close the database pool before exiting.
+const shutdown = (signal) => {
+  console.log(`${signal} received, shutting down`);
+  server.close(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+  // Don't hang forever on a stuck connection.
+  setTimeout(() => process.exit(1), 10_000).unref();
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

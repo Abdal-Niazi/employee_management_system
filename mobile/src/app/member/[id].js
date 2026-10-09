@@ -31,7 +31,9 @@ export default function MemberScreen() {
   const { id } = useLocalSearchParams();
   const load = useCallback(async () => {
     const member = await getTeamMember(id);
-    const [attendance, leave] = await Promise.all([getMemberAttendance(member, 7), getMemberLeave(member)]);
+    const leave = await getMemberLeave(member);
+    // Sample attendance, but shows their real approved leave days as "On leave".
+    const attendance = await getMemberAttendance(member, 7, leave);
     return { member, attendance, leave };
   }, [id]);
   const { status, data, error, reload } = useAsync(load);
@@ -79,7 +81,7 @@ export default function MemberScreen() {
           ))}
         </Card>
 
-        <Card title="Leave history" right={<SampleDataBadge label="Sample" />}>
+        <Card title="Leave history">
           {leave.length === 0 ? (
             <Text style={font.small}>No leave requests.</Text>
           ) : (
