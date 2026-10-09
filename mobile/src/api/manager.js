@@ -1,26 +1,17 @@
 import { todayKey } from "../utils/date";
-import { ApiError, request } from "./client";
+import { request } from "./client";
 import * as mock from "./mock";
 
 // Everything the manager screens need. Team and leave data are real; attendance
 // is sample data (see mock.js) until GET /api/manager/attendance exists.
+// The backend works out whose team it is from the signed-in manager account.
 
-// Manager accounts don't exist yet, so an admin login views the team of the
-// employee set in mobile/.env. Once managers can sign in, the backend uses the
-// signed-in manager and this setting goes away.
 function managerUrl(path, params = {}) {
-  const managerId = process.env.EXPO_PUBLIC_MANAGER_ID;
-  if (!managerId) {
-    throw new ApiError(
-      "Set EXPO_PUBLIC_MANAGER_ID in mobile/.env to the id of the manager whose team you want to see.",
-      0
-    );
-  }
-  const query = Object.entries({ managerId, ...params })
+  const query = Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null)
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join("&");
-  return `${path}?${query}`;
+  return query ? `${path}?${query}` : path;
 }
 
 // Real: GET /api/manager/team

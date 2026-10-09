@@ -5,6 +5,10 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000
 // A wrong IP or a firewall block can otherwise leave a screen spinning for minutes.
 const TIMEOUT_MS = 10_000;
 
+// Release builds only talk to an HTTPS API, so passwords and tokens are never sent in
+// plain text. Plain http is fine while developing on a local network.
+const INSECURE_API = !__DEV__ && !API_URL.startsWith("https://");
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -26,6 +30,10 @@ export function setUnauthorizedHandler(handler) {
 }
 
 export async function request(path, options = {}) {
+  if (INSECURE_API) {
+    throw new ApiError("This build needs an https:// API address (EXPO_PUBLIC_API_URL).", 0);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const sentToken = authToken;

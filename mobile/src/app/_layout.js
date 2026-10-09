@@ -7,8 +7,8 @@ import { colors } from "../theme";
 // Expo Router moves to the first screen that is still available.
 function RootNavigator() {
   const { user, restoring } = useAuth();
-  // HR admins are the only real accounts for now, so they see the team screens too.
-  const isManager = user?.role === "manager" || user?.role === "hr_admin";
+  // Only manager accounts get the team screens; the API refuses everyone else there too.
+  const isManager = user?.role === "manager";
 
   // Don't flash the login screen while a saved session is being checked.
   if (restoring) return null;

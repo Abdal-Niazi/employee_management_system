@@ -5,10 +5,9 @@ It talks to the Express API in `../backend`; it never connects to PostgreSQL dir
 
 ## Run it
 
-Start PostgreSQL and the backend first. Once, in `../backend`: add `JWT_SECRET` to `.env` (any long
-random string), run `npm install` and `npx prisma migrate deploy`, and create an account with
-`npm run create-admin`. For sample leave requests, run `npm run seed` (safe to repeat: people who
-already have requests are skipped). Then start it with `node server.js` (port 5000). Then, here:
+Start PostgreSQL and the backend first (see `../backend/README.md`): `npm install`,
+`npm run migrate:deploy`, a manager account (below), optionally `npm run seed` for sample leave
+requests, then `npm start` (port 5000). Then, here:
 
 ```bash
 npm install
@@ -27,23 +26,24 @@ EXPO_PUBLIC_API_URL=http://192.168.1.20:5000
 
 The phone and computer must be on the same Wi-Fi, and Windows Firewall must allow port 5000.
 
-### Which manager's team you see
+### A manager account
 
-Managers can't sign in yet, so the app shows the team of the employee set in `mobile/.env`
-(their database `id`, not their employee code):
+Each manager signs in with their own account, which belongs to one employee. In `../backend` run
+`npm run create-admin`, choose role `MANAGER`, and give that employee's database `id` (not their
+employee code). The manager then sees the employees whose `managerId` is that id; HR sets it with
+`PATCH /api/employees/:id` and `{ "managerId": 4 }` (`null` removes it).
 
-```
-EXPO_PUBLIC_MANAGER_ID=4
-```
+### Release builds
 
-An employee's manager is set by HR with `PATCH /api/employees/:id` and `{ "managerId": 4 }`
-(`null` removes it). Restart with `npx expo start --clear` after changing `.env`.
+A release build only accepts an `https://` `EXPO_PUBLIC_API_URL`; plain `http://` works in
+development only.
 
 ## Sign in
 
 Sign-in calls `POST /api/auth/login`, and the server says which role the account has
 (`HR_ADMIN` or `MANAGER`; create accounts with `npm run create-admin` in `backend/`). Managers see
-the manager screens; for now HR admins see them too, since their own screens are not built yet. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
+the manager screens, and only for their own team; HR admins see a placeholder until their screens
+are built. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
 out) and sent as a Bearer token. A 401 signs you out.
 
 ## What is real and what is sample data
