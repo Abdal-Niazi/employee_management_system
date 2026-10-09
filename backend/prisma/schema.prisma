@@ -52,11 +52,18 @@ model LeaveRequest {
   @@index([employeeId, status])
 }
 
+enum Role {
+  HR_ADMIN
+  MANAGER
+}
+
+// Staff accounts that can log in. Existing accounts are HR admins.
 model Admin {
   id           Int      @id @default(autoincrement())
   email        String   @unique
   name         String
   passwordHash String
+  role         Role     @default(HR_ADMIN)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

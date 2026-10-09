@@ -1,11 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { loginRequest } from "../api/auth";
+import { getCurrentAdmin, loginRequest } from "../api/auth";
 import { setAuthToken, setUnauthorizedHandler } from "../api/client";
-
-// The server checks the email and password and returns a JWT, which client.js sends
-// with every request. The backend only has HR admin accounts and no roles yet, so the
-// role still comes from "Sign in as" on the login screen. The token lives in memory,
-// so reloading the app signs you out (expo-secure-store can keep it once roles exist).
+import { clearToken, loadToken, saveToken } from "./tokenStorage";
 
 export const ROLES = {
   manager: "Manager",
@@ -15,27 +11,56 @@ export const ROLES = {
 
 const AuthContext = createContext(null);
 
+// The server decides the role; its values map to the app's role keys.
+const SERVER_ROLES = { HR_ADMIN: "hr_admin", MANAGER: "manager" };
+const toUser = (admin) => ({ ...admin, role: SERVER_ROLES[admin.role] });
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [restoring, setRestoring] = useState(true);
 
-  const login = async ({ email, password, role }) => {
-    const { token, account } = await loginRequest(email, password);
-    setAuthToken(token);
-    setUser({ email: account?.email ?? email, name: account?.name ?? null, role });
-  };
-
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     setAuthToken(null);
     setUser(null);
+    await clearToken().catch(() => {});
   }, []);
 
-  // A rejected token (e.g. expired after 8 hours) signs the user out.
   useEffect(() => {
     setUnauthorizedHandler(logout);
-    return () => setUnauthorizedHandler(null);
   }, [logout]);
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  // Pick the saved session back up on app start; the server decides if it is still valid.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const token = await loadToken();
+        if (!token) return;
+        setAuthToken(token);
+        const admin = await getCurrentAdmin();
+        if (!cancelled) setUser(toUser(admin));
+      } catch {
+        // Expired token (401) is cleared by the client; an unreachable API just shows the login screen.
+        setAuthToken(null);
+      } finally {
+        if (!cancelled) setRestoring(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const login = async (email, password) => {
+    const { token, admin } = await loginRequest(email, password);
+    setAuthToken(token);
+    await saveToken(token).catch(() => {});
+    setUser(toUser(admin));
+  };
+
+  return <AuthContext.Provider value={{ user, restoring, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

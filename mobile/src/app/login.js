@@ -1,19 +1,20 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { ROLES, useAuth } from "../auth/AuthContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "../auth/AuthContext";
 import Button from "../components/Button";
-import SegmentedControl from "../components/SegmentedControl";
-import { colors, font, radius, spacing } from "../theme";
+import { colors, radius, spacing } from "../theme";
 
-const ROLE_OPTIONS = Object.entries(ROLES).map(([value, label]) => ({ value, label }));
+// How far the card rises over the blue header.
+const CARD_OVERLAP = 40;
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("manager");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,98 +27,95 @@ export default function LoginScreen() {
       setError("Enter your password.");
       return;
     }
-    setError("");
+
     setSubmitting(true);
     try {
-      await login({ email: email.trim(), password, role });
-      // On success this screen closes, so there's nothing left to reset.
-    } catch (e) {
-      setError(e.message);
+      await login(email.trim(), password);
+    } catch (err) {
+      setError(err.message);
       setSubmitting(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.root}>
+      <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.brand}>
+          <View style={[styles.header, { paddingTop: insets.top + spacing.xl * 2 }]}>
             <View style={styles.logo}>
-              <Ionicons name="people" size={28} color="#fff" />
+              <Ionicons name="people" size={30} color={colors.primary} />
             </View>
-            <Text style={font.title}>Employee Management</Text>
-            <Text style={font.small}>Sign in to continue</Text>
+            <Text style={styles.headerTitle}>Welcome back</Text>
+            <Text style={styles.headerSubtitle}>Sign in to Employee Management</Text>
           </View>
 
-          <View style={styles.card}>
-            <View style={styles.notice}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.info} />
-              <Text style={styles.noticeText}>
-                The server has no manager accounts yet. Sign in with an HR admin account and pick Manager to see the
-                manager screens.
-              </Text>
+          <View style={styles.cardWrap}>
+            <View style={styles.card}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setError("");
+                }}
+                placeholder="you@company.com"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setError("");
+                }}
+                onSubmitEditing={handleSignIn}
+                placeholder="Your password"
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                style={styles.input}
+              />
+
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              <Button title="Sign in" onPress={handleSignIn} loading={submitting} style={styles.submit} />
             </View>
-
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setError("");
-              }}
-              placeholder="you@company.com"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              editable={!submitting}
-              style={styles.input}
-            />
-
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError("");
-              }}
-              placeholder="Your password"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              autoComplete="password"
-              returnKeyType="go"
-              onSubmitEditing={handleSignIn}
-              editable={!submitting}
-              style={styles.input}
-            />
-
-            <Text style={styles.label}>Sign in as</Text>
-            <SegmentedControl options={ROLE_OPTIONS} value={role} onChange={setRole} />
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <Button title="Sign in" onPress={handleSignIn} loading={submitting} style={styles.submit} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: "center", padding: spacing.lg },
-  brand: { alignItems: "center", gap: spacing.xs, marginBottom: spacing.xl },
-  logo: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
+  scroll: { flexGrow: 1, paddingBottom: spacing.xl },
+  header: {
+    alignItems: "center",
     backgroundColor: colors.primary,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl + CARD_OVERLAP,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: spacing.sm,
+    marginBottom: spacing.lg,
   },
+  headerTitle: { fontSize: 26, fontWeight: "700", color: colors.surface },
+  headerSubtitle: { fontSize: 14, color: colors.surface, opacity: 0.85, marginTop: spacing.xs },
+  cardWrap: { paddingHorizontal: spacing.lg, marginTop: -CARD_OVERLAP },
   card: {
     width: "100%",
     maxWidth: 420,
@@ -127,17 +125,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.xl,
+    shadowColor: colors.text,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  notice: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    backgroundColor: colors.infoSoft,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  noticeText: { flex: 1, fontSize: 13, color: colors.text },
-  label: { fontSize: 14, fontWeight: "600", color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
+  label: { fontSize: 14, fontWeight: "600", color: colors.text, marginTop: spacing.md, marginBottom: spacing.sm },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

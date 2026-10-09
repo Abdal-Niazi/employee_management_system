@@ -14,6 +14,7 @@ const loginSchema = z.object({
 const createAdminSchema = z.object({
   email,
   name: z.string({ error: "name is required" }).trim().min(1, "name is required"),
+  role: z.enum(["HR_ADMIN", "MANAGER"], { error: "role must be HR_ADMIN or MANAGER" }),
   password: z
     .string({ error: "password is required" })
     .min(8, "password must be at least 8 characters"),

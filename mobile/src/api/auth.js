@@ -1,11 +1,10 @@
 import { request } from "./client";
 
-// POST /api/auth/login → { token, admin } today. `user` is accepted too, for when
-// the backend has one account table with roles.
-export async function loginRequest(email, password) {
-  const body = await request("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
-  return { token: body.token, account: body.user ?? body.admin };
+export function loginRequest(email, password) {
+  return request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+}
+
+export async function getCurrentAdmin() {
+  const { admin } = await request("/api/auth/me");
+  return admin;
 }

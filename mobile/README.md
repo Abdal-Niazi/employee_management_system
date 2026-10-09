@@ -41,12 +41,10 @@ An employee's manager is set by HR with `PATCH /api/employees/:id` and `{ "manag
 
 ## Sign in
 
-Sign-in uses the backend (`POST /api/auth/login`), and the returned token is sent as
-`Authorization: Bearer <token>` with every request. The backend only has HR admin accounts and no
-roles yet, so sign in with an admin account and pick **Manager** under "Sign in as" to open the
-manager app. HR Admin and Employee show a placeholder (those screens live on `feature/hr-admin` /
-`feature/employee`). The token is kept in memory: reloading the app, or the token expiring
-(after 8 hours), signs you out.
+Sign-in calls `POST /api/auth/login`, and the server says which role the account has
+(`HR_ADMIN` or `MANAGER`; create accounts with `npm run create-admin` in `backend/`). Managers see
+the manager screens; for now HR admins see them too, since their own screens are not built yet. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
+out) and sent as a Bearer token. A 401 signs you out.
 
 ## What is real and what is sample data
 
@@ -64,11 +62,11 @@ Screens with sample data show a yellow **Sample data** badge. All data access go
 
 ```
 src/app/            screens (Expo Router — every file is a route)
-  login.js          sign-in against the backend
+  login.js          email + password sign-in
   (manager)/        bottom tabs: Overview, My Team, Attendance, Leave
   member/[id].js    team member details
-  coming-soon.js    HR Admin / Employee placeholder
-src/api/            client.js (fetch wrapper + token), auth.js, manager.js, mock.js
+  coming-soon.js    placeholder for roles without screens yet
+src/api/            client.js (fetch wrapper + Bearer token), auth.js, manager.js, mock.js
 src/components/     shared UI
-src/auth/           session: user + token in memory (expo-secure-store later)
+src/auth/           session (AuthContext) and token storage
 ```
