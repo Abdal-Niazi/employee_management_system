@@ -66,7 +66,7 @@ Employee screens read `/api/me` through `src/api/me.js`:
 
 | Screen | Endpoints |
 |---|---|
-| My profile | `GET /api/me` (their details and manager) |
+| My profile (home) | `GET /api/me` (their details and manager), `GET /api/me/attendance?days=1` and `POST /api/me/check-in`, `POST /api/me/check-out` for the Today card |
 | My attendance | `GET /api/me/attendance?days=14` |
 | My leave | `GET /api/me/leave-requests`, `POST /api/me/leave-requests`, `DELETE /api/me/leave-requests/:id` (pending only) |
 

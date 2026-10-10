@@ -14,6 +14,10 @@ router.get("/", meController.getProfile);
 
 router.get("/attendance", meController.getAttendance);
 
+router.post("/check-in", meController.checkIn);
+
+router.post("/check-out", meController.checkOut);
+
 router.get("/leave-requests", meController.getLeaveRequests);
 
 router.post("/leave-requests", validate(createLeaveSchema), meController.requestLeave);

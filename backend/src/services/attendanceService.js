@@ -184,6 +184,58 @@ const clearDay = async (employeeId, date) => {
   if (count === 0) throw new AppError("No attendance is recorded for that employee on that day", 404);
 };
 
+// ---------- Employee (themselves) ----------
+
+// "08:52" in the server's local time. The server's clock is used, not the phone's, so the
+// time can't be set by hand.
+const timeKey = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+const assertCanCheckIn = (employee) => {
+  if (employee.status !== "active") {
+    throw new AppError("Only active employees can check in", 403);
+  }
+};
+
+// Today's record, with the check-in time set to now.
+const checkInSelf = async (employee, now = new Date()) => {
+  assertCanCheckIn(employee);
+
+  const today = localDateKey(now);
+  const checkIn = timeKey(now);
+
+  try {
+    await prisma.attendance.create({ data: { employeeId: employee.id, date: dateFromKey(today), checkIn } });
+  } catch (error) {
+    // The unique (employee, day) row already exists
+    if (error.code === "P2002") throw new AppError("You have already checked in today", 409);
+    throw error;
+  }
+
+  return buildRecord({ employee, dateKey: today, row: { checkIn, checkOut: null }, now });
+};
+
+// Sets today's check-out to now. It is never earlier than the check-in.
+const checkOutSelf = async (employee, now = new Date()) => {
+  assertCanCheckIn(employee);
+
+  const today = localDateKey(now);
+  const row = await prisma.attendance.findUnique({
+    where: { employeeId_date: { employeeId: employee.id, date: dateFromKey(today) } },
+  });
+
+  if (!row) throw new AppError("Check in first", 409);
+  if (row.checkOut) throw new AppError("You have already checked out today", 409);
+
+  const nowTime = timeKey(now);
+  const checkOut = nowTime > row.checkIn ? nowTime : row.checkIn;
+
+  // Only a still-open day changes, so two taps can't both win.
+  const { count } = await prisma.attendance.updateMany({ where: { id: row.id, checkOut: null }, data: { checkOut } });
+  if (count === 0) throw new AppError("You have already checked out today", 409);
+
+  return buildRecord({ employee, dateKey: today, row: { checkIn: row.checkIn, checkOut }, now });
+};
+
 module.exports = {
   SHIFT,
   buildRecord,
@@ -194,4 +246,6 @@ module.exports = {
   getAllDay,
   recordDay,
   clearDay,
+  checkInSelf,
+  checkOutSelf,
 };

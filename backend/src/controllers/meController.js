@@ -50,4 +50,18 @@ const cancelLeave = async (req, res) => {
   res.status(200).json({ message: "Leave request cancelled" });
 };
 
-module.exports = { getProfile, getAttendance, getLeaveRequests, requestLeave, cancelLeave };
+const checkIn = async (req, res) => {
+  const employee = await ownEmployee(req);
+  const record = await attendanceService.checkInSelf(employee);
+
+  res.status(200).json({ message: "Checked in", record });
+};
+
+const checkOut = async (req, res) => {
+  const employee = await ownEmployee(req);
+  const record = await attendanceService.checkOutSelf(employee);
+
+  res.status(200).json({ message: "Checked out", record });
+};
+
+module.exports = { getProfile, getAttendance, getLeaveRequests, requestLeave, cancelLeave, checkIn, checkOut };
