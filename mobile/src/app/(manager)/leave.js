@@ -66,7 +66,7 @@ export default function LeaveScreen() {
         style={styles.flex}
         contentContainerStyle={styles.content}
         data={data}
-        keyExtractor={(r) => r.id}
+        keyExtractor={(r) => String(r.id)}
         refreshing={refreshing}
         onRefresh={refresh}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}

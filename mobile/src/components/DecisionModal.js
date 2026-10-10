@@ -45,6 +45,7 @@ function DecisionSheet({ request, approving, submitting, error, onCancel, onConf
         placeholder={approving ? "Add a note (optional)" : "Reason for rejecting (optional)"}
         placeholderTextColor={colors.muted}
         multiline
+        maxLength={500} // the server's limit
         style={styles.input}
         editable={!submitting}
       />

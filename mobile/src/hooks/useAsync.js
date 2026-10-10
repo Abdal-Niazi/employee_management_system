@@ -2,8 +2,9 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 
 // Loads data whenever the screen gains focus, so changes made on another tab show
-// up. Refocusing refetches quietly behind the current data; passing a different
-// `loader` (e.g. a new date) shows the loading state. Stale responses are dropped.
+// up. Refocusing refetches quietly behind the current data (and keeps it if that fails);
+// passing a different `loader` (e.g. a new date) shows the loading state. Stale responses
+// are dropped.
 // `loader` must be stable: a module function or one wrapped in useCallback.
 export function useAsync(loader) {
   const [state, setState] = useState({ status: "loading", data: null, error: null });
@@ -26,6 +27,10 @@ export function useAsync(loader) {
         setState({ status: "success", data, error: null });
       } catch (error) {
         if (id !== requestId.current) return;
+        // A quiet refetch (refocus, pull-to-refresh, after an action) that fails keeps the data
+        // already on screen, e.g. on a brief network drop; a first load, a Retry or a new
+        // loader shows the error instead.
+        if (mode !== "reload" && shownLoader.current === loader) return;
         shownLoader.current = null;
         setState({ status: "error", data: null, error });
       } finally {
