@@ -23,8 +23,8 @@ const createAdminSchema = z
       .trim()
       .min(1, "name is required")
       .max(100, "name must be at most 100 characters"),
-    role: z.enum(["HR_ADMIN", "MANAGER"], { error: "role must be HR_ADMIN or MANAGER" }),
-    // The employee a MANAGER account belongs to (their database id)
+    role: z.enum(["HR_ADMIN", "MANAGER", "EMPLOYEE"], { error: "role must be HR_ADMIN, MANAGER or EMPLOYEE" }),
+    // The employee a MANAGER or EMPLOYEE account belongs to (their database id)
     employeeId: z
       .number({ error: "employeeId must be a number" })
       .int("employeeId must be a positive integer")
@@ -36,12 +36,12 @@ const createAdminSchema = z
       // bcrypt ignores everything after 72 bytes, so longer passwords would be silently cut.
       .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "password must be at most 72 bytes"),
   })
-  .refine((data) => data.role !== "MANAGER" || data.employeeId, {
-    error: "A MANAGER account needs the employeeId of the employee it belongs to",
+  .refine((data) => data.role === "HR_ADMIN" || data.employeeId, {
+    error: "A MANAGER or EMPLOYEE account needs the employeeId of the employee it belongs to",
     path: ["employeeId"],
   })
   .refine((data) => data.role !== "HR_ADMIN" || !data.employeeId, {
-    error: "Only MANAGER accounts are linked to an employee",
+    error: "Only MANAGER and EMPLOYEE accounts are linked to an employee",
     path: ["employeeId"],
   });
 

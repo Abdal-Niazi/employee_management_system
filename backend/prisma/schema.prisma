@@ -76,6 +76,7 @@ model Attendance {
 enum Role {
   HR_ADMIN
   MANAGER
+  EMPLOYEE
 }
 
 // Staff accounts that can log in. Existing accounts are HR admins.
@@ -85,7 +86,7 @@ model Admin {
   name         String
   passwordHash String
   role         Role      @default(HR_ADMIN)
-  // For MANAGER accounts: the employee they are, whose team they manage
+  // For MANAGER and EMPLOYEE accounts: the employee they are
   employeeId   Int?      @unique
   employee     Employee? @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())

@@ -3,16 +3,10 @@ import { getCurrentAdmin, loginRequest } from "../api/auth";
 import { setAuthToken, setUnauthorizedHandler } from "../api/client";
 import { clearToken, loadToken, saveToken } from "./tokenStorage";
 
-export const ROLES = {
-  manager: "Manager",
-  hr_admin: "HR Admin",
-  employee: "Employee",
-};
-
 const AuthContext = createContext(null);
 
 // The server decides the role; its values map to the app's role keys.
-const SERVER_ROLES = { HR_ADMIN: "hr_admin", MANAGER: "manager" };
+const SERVER_ROLES = { HR_ADMIN: "hr_admin", MANAGER: "manager", EMPLOYEE: "employee" };
 const toUser = (admin) => ({ ...admin, role: SERVER_ROLES[admin.role] });
 
 export function AuthProvider({ children }) {

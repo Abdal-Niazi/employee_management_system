@@ -83,12 +83,12 @@ const main = async () => {
   const input = {
     email: await ask("Email: "),
     name: await ask("Name: "),
-    role: (await ask("Role (HR_ADMIN or MANAGER) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
+    role: (await ask("Role (HR_ADMIN, MANAGER or EMPLOYEE) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
   };
 
-  // A manager account belongs to one employee: the person whose team it manages.
-  if (input.role === "MANAGER") {
-    const answer = (await ask("Employee database id of this manager: ")).trim();
+  // Manager and employee accounts belong to one employee (a manager's team is the people reporting to them).
+  if (input.role === "MANAGER" || input.role === "EMPLOYEE") {
+    const answer = (await ask("Employee database id this account belongs to: ")).trim();
     input.employeeId = answer === "" ? null : Number(answer);
   }
 

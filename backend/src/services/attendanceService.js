@@ -118,20 +118,25 @@ const getTeamDay = async (managerId, dateKey, now = new Date()) => {
   return dayFor(team, dateKey, now);
 };
 
-// The last `days` days of one team member, newest first, or null if they aren't in the team.
-const getMemberDays = async (managerId, employeeId, days, now = new Date()) => {
-  const member = await managerService.getTeamMember(managerId, employeeId);
-  if (!member) return null;
-
+// The last `days` days of an employee, newest first.
+const getEmployeeDays = async (employee, days, now = new Date()) => {
   const today = localDateKey(now);
   const from = addDays(today, -(days - 1));
-  const [rows, approvedLeave] = await Promise.all([rowsFor([member.id], from, today), approvedLeaveFor([member.id], from, today)]);
+  const [rows, approvedLeave] = await Promise.all([rowsFor([employee.id], from, today), approvedLeaveFor([employee.id], from, today)]);
   const rowByDate = new Map(rows.map((row) => [utcDateKey(row.date), row]));
 
   return Array.from({ length: days }, (_, i) => {
     const dateKey = addDays(today, -i);
-    return buildRecord({ employee: member, dateKey, row: rowByDate.get(dateKey), approvedLeave, now });
+    return buildRecord({ employee, dateKey, row: rowByDate.get(dateKey), approvedLeave, now });
   });
+};
+
+// Same for one team member, or null if they aren't in the manager's team.
+const getMemberDays = async (managerId, employeeId, days, now = new Date()) => {
+  const member = await managerService.getTeamMember(managerId, employeeId);
+  if (!member) return null;
+
+  return getEmployeeDays(member, days, now);
 };
 
 // ---------- HR admin ----------
@@ -184,6 +189,7 @@ module.exports = {
   buildRecord,
   localDateKey,
   getTeamDay,
+  getEmployeeDays,
   getMemberDays,
   getAllDay,
   recordDay,

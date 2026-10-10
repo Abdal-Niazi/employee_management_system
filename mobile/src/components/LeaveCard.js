@@ -12,7 +12,7 @@ export function leaveSummary(request) {
   return `${formatRange(request.startDate, request.endDate)} · ${days}`;
 }
 
-export default function LeaveCard({ request, onApprove, onReject, showName = true }) {
+export default function LeaveCard({ request, onApprove, onReject, onCancel, showName = true }) {
   const pending = request.status === "PENDING";
 
   return (
@@ -31,13 +31,19 @@ export default function LeaveCard({ request, onApprove, onReject, showName = tru
         <Ionicons name="calendar-outline" size={16} color={colors.muted} />
         <Text style={font.body}>{leaveSummary(request)}</Text>
       </View>
-      <Text style={[font.body, styles.reason]}>“{request.reason}”</Text>
+      {request.reason ? <Text style={[font.body, styles.reason]}>“{request.reason}”</Text> : <View style={styles.noReason} />}
 
       <Text style={font.small}>
         Requested {timeAgo(request.requestedAt)}
         {!pending && ` · ${statusInfo(request.status).label} ${timeAgo(request.decidedAt)}`}
       </Text>
       {request.decisionNote && <Text style={[font.small, styles.note]}>Note: {request.decisionNote}</Text>}
+
+      {pending && onCancel && (
+        <View style={styles.actions}>
+          <Button title="Cancel request" icon="close" variant="danger" onPress={() => onCancel(request)} style={styles.action} />
+        </View>
+      )}
 
       {pending && onApprove && onReject && (
         <View style={styles.actions}>
@@ -60,6 +66,7 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, gap: 2 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   reason: { color: colors.muted, fontStyle: "italic", marginVertical: spacing.sm },
+  noReason: { height: spacing.sm },
   note: { marginTop: spacing.xs, color: colors.text },
   actions: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },
   action: { flex: 1 },
