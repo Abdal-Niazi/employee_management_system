@@ -8,13 +8,14 @@ Express 5 + Prisma 7 + PostgreSQL API for the Employee Management System.
 npm install
 cp .env.example .env          # then fill in DATABASE_URL and JWT_SECRET
 npm run migrate:deploy        # create or update the tables
-npm run create-admin          # an HR_ADMIN account, or a MANAGER linked to an employee
+npm run create-admin          # an HR_ADMIN account, or a MANAGER / EMPLOYEE linked to an employee
 npm run seed                  # optional: sample leave requests and six weeks of attendance
 npm start                     # http://localhost:5000
 ```
 
-`create-admin` asks for a role. A `MANAGER` account also needs the **database id** of the
-employee it belongs to; that manager then sees the employees whose `managerId` is that id.
+`create-admin` asks for a role. `MANAGER` and `EMPLOYEE` accounts also need the **database id**
+of the employee they belong to. A manager then sees the employees whose `managerId` is that id;
+an employee account checks that employee in and out. One account per employee.
 
 ## Who can do what
 
@@ -24,13 +25,15 @@ employee it belongs to; that manager then sees the employees whose `managerId` i
 | `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
+| `/api/me/...` (own check-in, check-out, own attendance) | `EMPLOYEE`, `MANAGER`; always the signed-in account's own employee |
 | `GET /health` | anyone; `{ "status": "ok" }` or 503 when the database is unreachable |
 
 ## Attendance
 
-Employees check themselves in and out (the Employee app, still to be built). Until then
-`npm run seed` fills the last six weeks with sample check-ins. Managers **can't change**
-attendance: when a record is wrong they ask HR for a correction, and only an HR approval changes it.
+Employees check themselves in and out (`/api/me`, below); managers do too, for their own days.
+`npm run seed` fills the last six weeks with sample check-ins, except **today** for anyone who has
+a login, since they check in themselves. Managers **can't change** their team's attendance: when a
+record is wrong they ask HR for a correction, and only an HR approval changes it.
 
 One shift for everyone, Monday to Friday, set in `.env`: `SHIFT_START` (09:00), `SHIFT_END`
 (17:00), `LATE_GRACE_MINUTES` (5) and `COMPANY_TIMEZONE` (Asia/Karachi). Times in requests and
@@ -61,6 +64,21 @@ in another timezone.
 `correctable` says whether the manager may ask for a correction now. Requests are allowed for
 today and the 6 days before it, on work days, not on approved leave, and one waiting request per
 person and day (409 otherwise). Leaving out `checkOut` keeps the recorded check-out.
+
+Own attendance (`EMPLOYEE` and `MANAGER` accounts, always the account's own employee):
+
+| Route | Does |
+|---|---|
+| `GET /api/me/attendance/today` | `{ today, workday, shift, record, canCheckIn, canCheckOut, notice }`; `notice` says why check-in is off |
+| `POST /api/me/attendance/check-in` | starts today's record at the server's time; returns the same object |
+| `POST /api/me/attendance/check-out` | ends it; returns the same object |
+| `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` |
+
+Check-in is refused on weekends and before the hire date (400), for an employee whose `status`
+isn't `active` (403), on approved leave (409), and a second time the same day (409). Check-out
+needs a check-in and works once (409 otherwise). Times always come from the server's clock, never
+the phone's. A forgotten or wrong check-in or check-out is fixed the usual way: the manager asks HR
+for a correction.
 
 ### For the HR app: attendance corrections
 

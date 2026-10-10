@@ -3,6 +3,7 @@ const attendanceService = require("../services/attendanceService");
 const AppError = require("../utils/AppError");
 const parseId = require("../utils/parseId");
 const parseDateKey = require("../utils/parseDateKey");
+const parseDays = require("../utils/parseDays");
 const { todayKey } = require("../utils/companyTime");
 const { LEAVE_STATUSES } = require("../validators/managerSchema");
 const { CORRECTION_STATUSES } = require("../validators/attendanceSchema");
@@ -89,19 +90,6 @@ const decideLeave = async (req, res) => {
 };
 
 // ---------- Attendance ----------
-
-const MAX_HISTORY_DAYS = 31;
-
-const parseDays = (value) => {
-  if (value === undefined) return 7;
-
-  const days = Number(value);
-  if (!Number.isInteger(days) || days < 1 || days > MAX_HISTORY_DAYS) {
-    throw new AppError(`days must be a whole number from 1 to ${MAX_HISTORY_DAYS}`, 400);
-  }
-
-  return days;
-};
 
 const getAttendance = async (req, res) => {
   const manager = await resolveManager(req);

@@ -153,7 +153,7 @@ const seedAttendance = async () => {
   );
 
   const employees = await prisma.employee.findMany({
-    include: { leaveRequests: { where: { status: "APPROVED" } } },
+    include: { leaveRequests: { where: { status: "APPROVED" } }, account: { select: { id: true } } },
     orderBy: { id: "asc" },
   });
 
@@ -164,9 +164,11 @@ const seedAttendance = async () => {
       employee.leaveRequests.some(
         (r) => companyTime.toDateKey(r.startDate) <= day && day <= companyTime.toDateKey(r.endDate)
       );
+    // People who can sign in check themselves in today; a sample check-in would block their button.
+    const checksInThemselves = (day) => employee.account && day === today;
 
     const data = days
-      .filter((day) => day >= hired && !onLeave(day))
+      .filter((day) => day >= hired && !onLeave(day) && !checksInThemselves(day))
       .map((day) => sampleDay(employee, day, today, nowMinutes))
       .filter(Boolean);
 

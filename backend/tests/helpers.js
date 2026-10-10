@@ -42,7 +42,8 @@ const leave = (employeeId, status = "PENDING") =>
     },
   });
 
-// Two managers with their own teams, an HR admin, and a manager account whose employee is gone.
+// Two managers with their own teams, an HR admin, an employee account for a1, and a manager
+// account whose employee is gone.
 const seedFixtures = async () => {
   await resetDatabase();
 
@@ -55,6 +56,7 @@ const seedFixtures = async () => {
   await account("hr@example.com", "HR_ADMIN");
   await account("manager.a@example.com", "MANAGER", managerA.id);
   await account("manager.b@example.com", "MANAGER", managerB.id);
+  await account("employee.a1@example.com", "EMPLOYEE", a1.id);
   await account("unlinked@example.com", "MANAGER", null);
 
   const leaveA1 = await leave(a1.id);

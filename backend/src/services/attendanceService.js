@@ -110,11 +110,10 @@ const getTeamDay = async (managerId, dateKey, now = new Date()) => {
   };
 };
 
-// One team member's last `days` days, newest first, or null if they aren't in the team.
-const getMemberHistory = async (managerId, employeeId, days, now = new Date()) => {
-  const employee = await managerService.getTeamMember(managerId, employeeId);
-  if (!employee) return null;
-
+// One person's last `days` days, newest first. Used by the manager's member page and by
+// the person's own history.
+const historyFor = async (employee, days, now) => {
+  const employeeId = employee.id;
   const today = todayKey(now);
   const from = addDays(today, -(days - 1));
   const range = { gte: asDbDate(from), lte: asDbDate(today) };
@@ -142,7 +141,114 @@ const getMemberHistory = async (managerId, employeeId, days, now = new Date()) =
     });
   });
 
+  return { today, records };
+};
+
+// One team member's last `days` days, newest first, or null if they aren't in the team.
+const getMemberHistory = async (managerId, employeeId, days, now = new Date()) => {
+  const employee = await managerService.getTeamMember(managerId, employeeId);
+  if (!employee) return null;
+
+  const { today, records } = await historyFor(employee, days, now);
   return { employee: toEmployeeDto(employee), today, shift: SHIFT, records };
+};
+
+// ---------- An employee's own attendance (employees and managers) ----------
+
+// A person's own view of a day: `correctable` is left out, because only managers ask HR to correct.
+const ownRecord = ({ correctable, ...record }) => record;
+
+// Why `employee` can't check in on `dateKey`, or null if they can. The card shows the same
+// message, so the app and the API never disagree.
+const checkInBlock = (employee, dateKey, onLeave) => {
+  if (isWeekend(dateKey)) return new AppError("There is no shift today", 400);
+
+  const firstDay = toDateKey(employee.hireDate);
+  if (dateKey < firstDay) return new AppError(`You can check in from your first day, ${firstDay}`, 400);
+
+  if (employee.status !== "active") {
+    return new AppError("Your employee record isn't active, so you can't check in. Please contact HR.", 403);
+  }
+  if (onLeave) return new AppError("You're on approved leave today", 409);
+
+  return null;
+};
+
+const findApprovedLeave = (employee, date) =>
+  prisma.leaveRequest.findFirst({ where: { employeeId: employee.id, ...approvedLeaveOn(date) } });
+
+const findOwnRow = (employee, date) =>
+  prisma.attendance.findUnique({ where: { employeeId_date: { employeeId: employee.id, date } } });
+
+// Today for the check-in card: the record, and whether the person may check in or out now.
+const getMyDay = async (employee, now = new Date()) => {
+  const today = todayKey(now);
+  const date = asDbDate(today);
+
+  const [row, leave, corrections] = await Promise.all([
+    findOwnRow(employee, date),
+    findApprovedLeave(employee, date),
+    prisma.attendanceCorrection.findMany({
+      where: { employeeId: employee.id, date, ...VISIBLE_CORRECTIONS },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  const onLeave = Boolean(leave);
+  const block = row ? null : checkInBlock(employee, today, onLeave);
+
+  return {
+    today,
+    workday: !isWeekend(today),
+    shift: SHIFT,
+    record: ownRecord(toRecord({ employee, dateKey: today, row, onLeave, corrections, now })),
+    canCheckIn: !row && !block,
+    canCheckOut: Boolean(row) && !row.checkOut,
+    notice: block?.message ?? null,
+  };
+};
+
+// Starts today's record with the server's clock; the phone's clock is never trusted.
+const checkIn = async (employee, now = new Date()) => {
+  const today = todayKey(now);
+  const date = asDbDate(today);
+
+  const block = checkInBlock(employee, today, Boolean(await findApprovedLeave(employee, date)));
+  if (block) throw block;
+
+  try {
+    await prisma.attendance.create({ data: { employeeId: employee.id, date, checkIn: now } });
+  } catch (error) {
+    // One row per person per day (a unique key), so a second check-in fails here, even two at once.
+    if (error.code === "P2002") throw new AppError("You've already checked in today", 409);
+    throw error;
+  }
+
+  return getMyDay(employee, now);
+};
+
+// Ends today's record. A check-out can't be undone here; a wrong one is fixed through a correction.
+const checkOut = async (employee, now = new Date()) => {
+  const date = asDbDate(todayKey(now));
+
+  // Only a row without a check-out changes, checked in the same statement, so two taps can't both win.
+  const { count } = await prisma.attendance.updateMany({
+    where: { employeeId: employee.id, date, checkOut: null },
+    data: { checkOut: now },
+  });
+
+  if (count === 0) {
+    const row = await findOwnRow(employee, date);
+    throw new AppError(row ? "You've already checked out today" : "You haven't checked in today", 409);
+  }
+
+  return getMyDay(employee, now);
+};
+
+// The person's own last `days` days, newest first.
+const getMyHistory = async (employee, days, now = new Date()) => {
+  const { today, records } = await historyFor(employee, days, now);
+  return { today, shift: SHIFT, records: records.map(ownRecord) };
 };
 
 // ---------- Correction requests ----------
@@ -316,6 +422,10 @@ const decideCorrection = async (adminId, id, { status, note }) => {
 module.exports = {
   getTeamDay,
   getMemberHistory,
+  getMyDay,
+  checkIn,
+  checkOut,
+  getMyHistory,
   listTeamCorrections,
   listAllCorrections,
   requestCorrection,

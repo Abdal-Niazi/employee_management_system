@@ -33,7 +33,7 @@ model Employee {
   corrections        AttendanceCorrection[] @relation("CorrectionFor")
   correctionRequests AttendanceCorrection[] @relation("CorrectionRequester")
 
-  // The login account of this employee, if they have one (managers do)
+  // The login account of this employee, if they have one (a MANAGER or EMPLOYEE account)
   account Admin? @relation("AdminEmployee")
 
   @@index([managerId])
@@ -107,16 +107,17 @@ model AttendanceCorrection {
 enum Role {
   HR_ADMIN
   MANAGER
+  EMPLOYEE
 }
 
-// Staff accounts that can log in. Existing accounts are HR admins.
+// Accounts that can log in: HR admins, managers and employees.
 model Admin {
   id                  Int                    @id @default(autoincrement())
   email               String                 @unique
   name                String
   passwordHash        String
   role                Role                   @default(HR_ADMIN)
-  // For MANAGER accounts: the employee they are, whose team they manage
+  // For MANAGER and EMPLOYEE accounts: the employee they are (a manager's team hangs off it)
   employeeId          Int?                   @unique
   employee            Employee?              @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
   // Attendance corrections this HR admin approved or rejected

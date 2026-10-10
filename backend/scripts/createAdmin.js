@@ -1,9 +1,9 @@
-// Creates an HR admin or manager account. Run from backend: npm run create-admin
+// Creates an HR admin, manager or employee account. Run from backend: npm run create-admin
 require("dotenv").config({ quiet: true });
 
 const prisma = require("../src/utils/prisma");
 const authService = require("../src/services/authService");
-const { createAdminSchema } = require("../src/validators/authSchema");
+const { LINKED_ROLES, createAdminSchema } = require("../src/validators/authSchema");
 
 // Input is read straight from stdin rather than through readline, whose line
 // redrawing garbles prompts in some Windows terminals. Normal answers use the
@@ -83,12 +83,13 @@ const main = async () => {
   const input = {
     email: await ask("Email: "),
     name: await ask("Name: "),
-    role: (await ask("Role (HR_ADMIN or MANAGER) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
+    role: (await ask("Role (HR_ADMIN, MANAGER or EMPLOYEE) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
   };
 
-  // A manager account belongs to one employee: the person whose team it manages.
-  if (input.role === "MANAGER") {
-    const answer = (await ask("Employee database id of this manager: ")).trim();
+  // Manager and employee accounts belong to one employee: a manager is the person whose
+  // team it manages, and an employee account checks that person in and out.
+  if (LINKED_ROLES.includes(input.role)) {
+    const answer = (await ask(`Employee database id of this ${input.role.toLowerCase()}: `)).trim();
     input.employeeId = answer === "" ? null : Number(answer);
   }
 

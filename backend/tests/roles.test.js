@@ -4,12 +4,14 @@ const { app, prisma, request, seedFixtures, login } = require("./helpers");
 
 let hr;
 let manager;
+let employee;
 let unlinked;
 
 before(async () => {
   await seedFixtures();
   hr = await login("hr@example.com");
   manager = await login("manager.a@example.com");
+  employee = await login("employee.a1@example.com");
   unlinked = await login("unlinked@example.com");
 });
 after(() => prisma.$disconnect());
@@ -21,6 +23,27 @@ test("every API route needs a token", async () => {
   assert.equal((await request(app).get("/api/manager/attendance")).status, 401);
   assert.equal((await request(app).get("/api/attendance-corrections")).status, 401);
   assert.equal((await request(app).patch("/api/attendance-corrections/1").send({ status: "APPROVED" })).status, 401);
+  assert.equal((await request(app).get("/api/me/attendance/today")).status, 401);
+  assert.equal((await request(app).post("/api/me/attendance/check-in")).status, 401);
+});
+
+test("employees and managers use /api/me, HR admins don't", async () => {
+  assert.equal((await request(app).get("/api/me/attendance/today").set(employee)).status, 200);
+  assert.equal((await request(app).get("/api/me/attendance/today").set(manager)).status, 200);
+
+  assert.equal((await request(app).get("/api/me/attendance/today").set(hr)).status, 403);
+  assert.equal((await request(app).post("/api/me/attendance/check-in").set(hr)).status, 403);
+
+  const res = await request(app).get("/api/me/attendance").set(unlinked);
+  assert.equal(res.status, 403);
+  assert.match(res.body.message, /isn't linked to an employee/);
+});
+
+test("an employee account can't use the manager or HR routes", async () => {
+  assert.equal((await request(app).get("/api/manager/team").set(employee)).status, 403);
+  assert.equal((await request(app).get("/api/manager/attendance").set(employee)).status, 403);
+  assert.equal((await request(app).get("/api/employees").set(employee)).status, 403);
+  assert.equal((await request(app).get("/api/attendance-corrections").set(employee)).status, 403);
 });
 
 test("only HR admins can use /api/employees", async () => {

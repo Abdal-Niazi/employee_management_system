@@ -8,6 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const managerRoutes = require("./routes/managerRoutes");
 const correctionRoutes = require("./routes/correctionRoutes");
+const meRoutes = require("./routes/meRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -62,6 +63,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/attendance-corrections", correctionRoutes);
+app.use("/api/me", meRoutes);
 
 app.get("/", (req, res) => {
   res.json({
