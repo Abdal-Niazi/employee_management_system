@@ -5,7 +5,6 @@ import { getMemberAttendance, getMemberLeave, getTeamMember } from "../../api/ma
 import Avatar from "../../components/Avatar";
 import Card from "../../components/Card";
 import { leaveSummary } from "../../components/LeaveCard";
-import SampleDataBadge from "../../components/SampleDataBadge";
 import { ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
 import { useAsync } from "../../hooks/useAsync";
@@ -32,8 +31,7 @@ export default function MemberScreen() {
   const load = useCallback(async () => {
     const member = await getTeamMember(id);
     const leave = await getMemberLeave(member);
-    // Sample attendance, but shows their real approved leave days as "On leave".
-    const attendance = await getMemberAttendance(member, 7, leave);
+    const attendance = await getMemberAttendance(member, 7);
     return { member, attendance, leave };
   }, [id]);
   const { status, data, error, reload } = useAsync(load);
@@ -71,7 +69,7 @@ export default function MemberScreen() {
           <DetailRow label="Hire date" value={formatIsoDate(member.hireDate)} />
         </Card>
 
-        <Card title="Last 7 days" right={<SampleDataBadge label="Sample" />}>
+        <Card title="Last 7 days">
           {attendance.map((record) => (
             <View key={record.date} style={styles.listRow}>
               <Text style={[font.body, styles.flex]}>{relativeDayLabel(record.date)}</Text>

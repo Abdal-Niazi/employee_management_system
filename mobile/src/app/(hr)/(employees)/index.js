@@ -2,14 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { getAllEmployees } from "../../api/hr";
-import Avatar from "../../components/Avatar";
-import SegmentedControl from "../../components/SegmentedControl";
-import { EmptyState, ErrorState, LoadingState } from "../../components/States";
-import StatusPill from "../../components/StatusPill";
-import { useAsync } from "../../hooks/useAsync";
-import { colors, font, radius, spacing } from "../../theme";
-import { fullName } from "../../utils/status";
+import { getAllEmployees } from "../../../api/hr";
+import Avatar from "../../../components/Avatar";
+import SegmentedControl from "../../../components/SegmentedControl";
+import { EmptyState, ErrorState, LoadingState } from "../../../components/States";
+import StatusPill from "../../../components/StatusPill";
+import { useAsync } from "../../../hooks/useAsync";
+import { colors, font, radius, spacing } from "../../../theme";
+import { fullName } from "../../../utils/status";
 
 const FILTERS = [
   { value: "all", label: "All" },

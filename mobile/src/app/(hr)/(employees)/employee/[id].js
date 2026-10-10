@@ -1,17 +1,17 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { deleteEmployee, getEmployee } from "../../../api/hr";
-import Avatar from "../../../components/Avatar";
-import Button from "../../../components/Button";
-import Card from "../../../components/Card";
-import ConfirmModal from "../../../components/ConfirmModal";
-import { ErrorState, LoadingState } from "../../../components/States";
-import StatusPill from "../../../components/StatusPill";
-import { useAsync } from "../../../hooks/useAsync";
-import { colors, font, spacing } from "../../../theme";
-import { formatIsoDate } from "../../../utils/date";
-import { fullName } from "../../../utils/status";
+import { deleteEmployee, getEmployee } from "../../../../api/hr";
+import Avatar from "../../../../components/Avatar";
+import Button from "../../../../components/Button";
+import Card from "../../../../components/Card";
+import ConfirmModal from "../../../../components/ConfirmModal";
+import { ErrorState, LoadingState } from "../../../../components/States";
+import StatusPill from "../../../../components/StatusPill";
+import { useAsync } from "../../../../hooks/useAsync";
+import { colors, font, spacing } from "../../../../theme";
+import { formatIsoDate } from "../../../../utils/date";
+import { fullName } from "../../../../utils/status";
 
 function DetailRow({ label, value }) {
   return (

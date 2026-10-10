@@ -33,3 +33,23 @@ export async function updateEmployee(id, data) {
 export async function deleteEmployee(id) {
   await request(`/api/employees/${id}`, { method: "DELETE" });
 }
+
+// Attendance (HR admins record it; managers read their team's through /api/manager).
+
+// Everyone's record for one day: { date, shift, rows: [{ employee, record }], counts }
+export function getAttendanceDay(dateKey) {
+  return request(`/api/attendance?date=${encodeURIComponent(dateKey)}`);
+}
+
+// Saves (or corrects) one employee's check-in and check-out for a day.
+export async function saveAttendance({ employeeId, date, checkIn, checkOut }) {
+  const { record } = await request("/api/attendance", {
+    method: "PUT",
+    body: JSON.stringify({ employeeId, date, checkIn, checkOut: checkOut || null }),
+  });
+  return record;
+}
+
+export async function removeAttendance(employeeId, date) {
+  await request(`/api/attendance/${employeeId}/${date}`, { method: "DELETE" });
+}
