@@ -26,11 +26,11 @@ EXPO_PUBLIC_API_URL=http://192.168.1.20:5000
 
 The phone and computer must be on the same Wi-Fi, and Windows Firewall must allow port 5000.
 
-### A manager account
+### Manager and employee accounts
 
-Each manager signs in with their own account, which belongs to one employee. In `../backend` run
-`npm run create-admin`, choose role `MANAGER`, and give that employee's database `id` (not their
-employee code). The manager then sees the employees whose `managerId` is that id; HR sets it with
+Each manager and each employee signs in with their own account, which belongs to one employee. In
+`../backend` run `npm run create-admin`, choose role `MANAGER` or `EMPLOYEE`, and give that employee's
+database `id` (not their employee code). The manager then sees the employees whose `managerId` is that id; HR sets it with
 `PATCH /api/employees/:id` and `{ "managerId": 4 }` (`null` removes it).
 
 ### Release builds
@@ -41,9 +41,9 @@ development only.
 ## Sign in
 
 Sign-in calls `POST /api/auth/login`, and the server says which role the account has
-(`HR_ADMIN` or `MANAGER`; create accounts with `npm run create-admin` in `backend/`). Managers see
-the manager screens, and only for their own team; HR admins see a placeholder until their screens
-are built. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
+(`HR_ADMIN`, `MANAGER` or `EMPLOYEE`; create accounts with `npm run create-admin` in `backend/`).
+HR admins get the employee and attendance screens, managers get their team's screens, and employees
+get their own profile, attendance and leave. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
 out) and sent as a Bearer token. A 401 signs you out.
 
 ## Where the data comes from
@@ -58,7 +58,16 @@ Every manager screen reads real data from `/api/manager`, through `src/api/manag
 | Overview | team, pending leave and today's attendance counts from the endpoints above |
 
 Attendance is recorded by HR admins (`PUT /api/attendance`); a day with no check-in is worked out
-as weekend, on leave, not in yet or absent. HR admin screens use `src/api/hr.js` (`/api/employees`).
+as weekend, on leave, not in yet or absent. HR admin screens use `src/api/hr.js` (`/api/employees`,
+`/api/attendance`).
+
+Employee screens read `/api/me` through `src/api/me.js`:
+
+| Screen | Endpoints |
+|---|---|
+| My profile | `GET /api/me` (their details and manager) |
+| My attendance | `GET /api/me/attendance?days=14` |
+| My leave | `GET /api/me/leave-requests`, `POST /api/me/leave-requests`, `DELETE /api/me/leave-requests/:id` (pending only) |
 
 ## Layout
 
