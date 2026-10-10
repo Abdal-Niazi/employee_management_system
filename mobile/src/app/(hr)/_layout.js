@@ -21,6 +21,19 @@ export default function HrLayout() {
       {/* The employees tab has its own stack (list, detail, add, edit) and header. */}
       <Tabs.Screen name="(employees)" options={{ title: "Employees", headerShown: false, tabBarIcon: icon("people") }} />
       <Tabs.Screen
+        name="leave"
+        options={{
+          title: "Leave requests",
+          tabBarLabel: "Leave",
+          tabBarIcon: icon("airplane"),
+          headerRight: () => (
+            <View style={{ marginRight: spacing.lg }}>
+              <SignOutButton />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="attendance"
         options={{
           title: "Attendance",
