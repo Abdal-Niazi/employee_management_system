@@ -16,6 +16,10 @@ router.get("/team/:id", managerController.getTeamMember);
 
 router.get("/team/:id/leave-requests", managerController.getMemberLeave);
 
+router.get("/team/:id/attendance", managerController.getMemberAttendance);
+
+router.get("/attendance", managerController.getAttendance);
+
 router.get("/leave-requests", managerController.getLeaveRequests);
 
 router.patch("/leave-requests/:id", validate(decideLeaveSchema), managerController.decideLeave);

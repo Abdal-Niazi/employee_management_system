@@ -26,6 +26,7 @@ model Employee {
   reports   Employee[] @relation("ManagerReports")
 
   leaveRequests  LeaveRequest[] @relation("EmployeeLeave")
+  attendance     Attendance[]
   leaveDecisions LeaveRequest[] @relation("LeaveDecider")
 
   // The login account of this employee, if they have one (managers do)
@@ -55,6 +56,23 @@ model LeaveRequest {
   @@index([employeeId, status])
 }
 
+// One row per employee per day they checked in. A day with no row is derived at read
+// time (weekend, on leave, not in yet, or absent), so nothing has to be written for it.
+model Attendance {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+  // Local wall-clock times as "HH:MM" (24-hour), the same shape the mobile app shows
+  checkIn    String
+  checkOut   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
+}
+
 enum Role {
   HR_ADMIN
   MANAGER
@@ -62,14 +80,14 @@ enum Role {
 
 // Staff accounts that can log in. Existing accounts are HR admins.
 model Admin {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
   name         String
   passwordHash String
-  role         Role     @default(HR_ADMIN)
+  role         Role      @default(HR_ADMIN)
   // For MANAGER accounts: the employee they are, whose team they manage
   employeeId   Int?      @unique
   employee     Employee? @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

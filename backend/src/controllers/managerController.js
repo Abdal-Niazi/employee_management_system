@@ -1,5 +1,7 @@
+const attendanceService = require("../services/attendanceService");
 const managerService = require("../services/managerService");
 const AppError = require("../utils/AppError");
+const { parseDateParam, parseDays } = require("../utils/attendanceQuery");
 const parseId = require("../utils/parseId");
 const { LEAVE_STATUSES } = require("../validators/managerSchema");
 
@@ -84,10 +86,41 @@ const decideLeave = async (req, res) => {
   });
 };
 
+// The team's attendance for one day (default today).
+const getAttendance = async (req, res) => {
+  const manager = await resolveManager(req);
+  const now = new Date();
+  const date = parseDateParam(req.query.date, attendanceService.localDateKey(now));
+  const day = await attendanceService.getTeamDay(manager.id, date, now);
+
+  res.status(200).json({
+    message: "Attendance retrieved successfully",
+    ...day,
+  });
+};
+
+// One team member's last few days, newest first.
+const getMemberAttendance = async (req, res) => {
+  const manager = await resolveManager(req);
+  const days = parseDays(req.query.days);
+  const attendance = await attendanceService.getMemberDays(manager.id, parseId(req.params.id, "Employee id"), days);
+
+  if (!attendance) {
+    throw new AppError("Team member not found", 404);
+  }
+
+  res.status(200).json({
+    message: "Attendance retrieved successfully",
+    attendance,
+  });
+};
+
 module.exports = {
   getTeam,
   getTeamMember,
   getLeaveRequests,
   getMemberLeave,
   decideLeave,
+  getAttendance,
+  getMemberAttendance,
 };
