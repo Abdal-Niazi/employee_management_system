@@ -9,6 +9,7 @@ npm install
 cp .env.example .env          # then fill in DATABASE_URL and JWT_SECRET
 npm run migrate:deploy        # create or update the tables
 npm run create-admin          # an HR_ADMIN account, or a MANAGER / EMPLOYEE linked to an employee
+npm run reset-device -- 12    # HR: forget employee 12's lost or replaced phone (see below)
 npm run seed                  # optional: sample leave requests and six weeks of attendance
 npm start                     # http://localhost:5000
 ```
@@ -22,7 +23,7 @@ an employee account checks that employee in and out. One account per employee.
 | Route | Who |
 |---|---|
 | `POST /api/auth/login`, `GET /api/auth/me` | anyone / any signed-in account |
-| `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete) | `HR_ADMIN` |
+| `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET`/`DELETE /:id/device` for the registered phone) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
 | `/api/me/...` (own check-in, check-out, own attendance) | `EMPLOYEE`, `MANAGER`; always the signed-in account's own employee |
@@ -70,9 +71,10 @@ Own attendance (`EMPLOYEE` and `MANAGER` accounts, always the account's own empl
 
 | Route | Does |
 |---|---|
-| `GET /api/me/attendance/today` | `{ today, workday, shift, record, canCheckIn, canCheckOut, notice }`; `notice` says why check-in is off |
-| `POST /api/me/attendance/check-in` | starts today's record at the server's time; returns the same object |
-| `POST /api/me/attendance/check-out` | ends it; returns the same object |
+| `GET /api/me/attendance/today` | `{ today, workday, shift, record, canCheckIn, canCheckOut, notice, deviceRegistered }`; `notice` says why check-in is off |
+| `POST /api/me/device` | registers this phone (`{ platform: "android" \| "ios" }`); 201 `{ key, device }`, the key only this once; 409 if one is already registered |
+| `POST /api/me/attendance/check-in` | header `X-Device-Key: <key>`; starts today's record at the server's time; returns the same object as today |
+| `POST /api/me/attendance/check-out` | header `X-Device-Key: <key>`; ends it; returns the same object |
 | `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` |
 
 Check-in is refused on weekends and before the hire date (400), for an employee whose `status`
@@ -80,6 +82,19 @@ isn't `active` (403), on approved leave (409), and a second time the same day (4
 needs a check-in and works once (409 otherwise). Times always come from the server's clock, never
 the phone's. A forgotten or wrong check-in or check-out is fixed the usual way: the manager asks HR
 for a correction.
+
+**Registered phones.** Each person checks in from one phone. The first time, the app registers it
+and the server returns a random key that the phone keeps in its secure storage; the server stores
+only the key's SHA-256 hash. Check-in and check-out are refused (403) without the right key, so
+nobody can check in from someone else's phone or from a browser. Before sending the key, the app
+asks for the phone's fingerprint or face (or its PIN), and no biometric data ever reaches the server.
+When a phone is lost or replaced, an HR admin resets it (`DELETE /api/employees/:id/device`, or
+`npm run reset-device -- <id>`), and the person registers the new one.
+
+Limits worth knowing: the fingerprint prompt is checked by the app, not the server (making the key
+unreadable without a fingerprint needs a development build, not Expo Go); iPhone Face ID needs a
+development build too (Expo Go uses the passcode); and someone technical could register a script
+instead of a phone the first time. The strongest option is still an office fingerprint machine.
 
 ### For the HR app: attendance corrections
 

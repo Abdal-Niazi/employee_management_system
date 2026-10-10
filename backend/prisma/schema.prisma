@@ -36,6 +36,9 @@ model Employee {
   // The login account of this employee, if they have one (a MANAGER or EMPLOYEE account)
   account Admin? @relation("AdminEmployee")
 
+  // The one phone this employee checks in from, once registered
+  device RegisteredDevice? @relation("EmployeeDevice")
+
   @@index([managerId])
 }
 
@@ -124,4 +127,17 @@ model Admin {
   correctionDecisions AttendanceCorrection[] @relation("CorrectionDecider")
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
+}
+
+// The one phone a person checks in from. The phone keeps a random key and sends it with every
+// check-in and check-out; the server keeps only the key's SHA-256 hash. HR removes the row when
+// the phone is lost or replaced, and the person registers the new one.
+model RegisteredDevice {
+  id         Int       @id @default(autoincrement())
+  employeeId Int       @unique
+  employee   Employee  @relation("EmployeeDevice", fields: [employeeId], references: [id], onDelete: Cascade)
+  keyHash    String
+  platform   String? // android or ios
+  createdAt  DateTime  @default(now()) // when it was registered
+  lastUsedAt DateTime?
 }

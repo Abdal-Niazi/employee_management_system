@@ -25,6 +25,8 @@ test("every API route needs a token", async () => {
   assert.equal((await request(app).patch("/api/attendance-corrections/1").send({ status: "APPROVED" })).status, 401);
   assert.equal((await request(app).get("/api/me/attendance/today")).status, 401);
   assert.equal((await request(app).post("/api/me/attendance/check-in")).status, 401);
+  assert.equal((await request(app).post("/api/me/device")).status, 401);
+  assert.equal((await request(app).delete("/api/employees/1/device")).status, 401);
 });
 
 test("employees and managers use /api/me, HR admins don't", async () => {

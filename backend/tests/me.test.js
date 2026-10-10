@@ -141,8 +141,15 @@ describe("the /api/me API (real clock)", () => {
 
   before(async () => {
     data = await seedFixtures();
-    employee = await login("employee.a1@example.com");
-    manager = await login("manager.a@example.com");
+
+    // Signed in, on their registered phone (its key goes with every request)
+    const onRegisteredPhone = async (email) => {
+      const auth = await login(email);
+      const { body } = await request(app).post("/api/me/device").set(auth).send({ platform: "android" });
+      return { ...auth, "X-Device-Key": body.key };
+    };
+    employee = await onRegisteredPhone("employee.a1@example.com");
+    manager = await onRegisteredPhone("manager.a@example.com");
   });
 
   test("today's card comes with the company's day", async () => {
@@ -154,6 +161,7 @@ describe("the /api/me API (real clock)", () => {
     assert.equal(res.body.shift.start, "09:00");
     assert.equal(res.body.canCheckIn, workday);
     assert.equal(res.body.canCheckOut, false);
+    assert.equal(res.body.deviceRegistered, true);
   });
 
   // The answer depends on whether today is a work day, so the suite passes on any day.
