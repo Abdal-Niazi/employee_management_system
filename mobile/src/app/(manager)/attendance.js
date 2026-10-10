@@ -10,7 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
 import { useAsync } from "../../hooks/useAsync";
 import { colors, font, radius, spacing } from "../../theme";
-import { addDays, formatDay, relativeDayLabel, todayKey } from "../../utils/date";
+import { addDays, formatDay, relativeDayLabel } from "../../utils/date";
 import { fullName } from "../../utils/status";
 
 const SUMMARY = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE"];
@@ -31,9 +31,11 @@ function describe(record, shift) {
   }
 }
 
-function DateNav({ date, shift, onChange }) {
-  const isToday = date === todayKey();
-  const label = relativeDayLabel(date);
+// `today` is the company's day, sent by the server, so a phone in another timezone
+// still shows the right day and can't ask for one that hasn't happened yet.
+function DateNav({ date, today, shift, onChange }) {
+  const isToday = !today || date === today;
+  const label = relativeDayLabel(date, today);
   const subtitle = label === formatDay(date) ? "" : formatDay(date);
   const details = [subtitle, shift && `Shift ${shift.start}–${shift.end}`].filter(Boolean).join(" · ");
   return (
@@ -77,9 +79,13 @@ function RequestsLink({ onPress }) {
 
 export default function AttendanceScreen() {
   const router = useRouter();
-  const [date, setDate] = useState(todayKey);
+  // Starts empty: the first load sends no date, so the server answers with its own today.
+  const [date, setDate] = useState(null);
   const load = useCallback(() => getTeamAttendance(date), [date]);
   const { status, data, error, reload, refresh, revalidate, refreshing } = useAsync(load);
+  // While a new day loads, keep showing the day that was picked.
+  const shown = date ?? data?.date ?? null;
+  const today = data?.today ?? null;
   const [target, setTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendError, setSendError] = useState(null);
@@ -181,12 +187,13 @@ export default function AttendanceScreen() {
 
   return (
     <View style={styles.screen}>
-      <DateNav date={date} shift={data?.shift} onChange={setDate} />
+      {shown && <DateNav date={shown} today={today} shift={data?.shift} onChange={setDate} />}
       {body}
 
       <CorrectionModal
         target={target}
-        date={date}
+        date={shown}
+        today={today}
         submitting={submitting}
         error={sendError}
         onCancel={() => setTarget(null)}

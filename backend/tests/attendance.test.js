@@ -136,6 +136,8 @@ describe("attendance API", () => {
 
       assert.equal(res.status, 200);
       assert.equal(res.body.date, TUESDAY);
+      // The company's day comes along with every answer, whatever day is being viewed.
+      assert.equal(res.body.today, today);
       assert.equal(res.body.workday, true);
       assert.equal(res.body.shift.start, "09:00");
       assert.deepEqual(
@@ -171,7 +173,9 @@ describe("attendance API", () => {
     test("defaults to today and refuses bad or future dates", async () => {
       const res = await request(app).get("/api/manager/attendance").set(managerA);
       assert.equal(res.status, 200);
+      // No date at all: the server uses its own day, so the app never has to guess it.
       assert.equal(res.body.date, today);
+      assert.equal(res.body.today, today);
 
       for (const date of ["abc", "2026-13-01", "2026-02-30", addDays(today, 1)]) {
         const bad = await request(app).get(`/api/manager/attendance?date=${date}`).set(managerA);
@@ -185,6 +189,7 @@ describe("attendance API", () => {
       const res = await request(app).get(`/api/manager/team/${data.a1.id}/attendance`).set(managerA);
 
       assert.equal(res.status, 200);
+      assert.equal(res.body.today, today);
       assert.equal(res.body.records.length, 7);
       assert.equal(res.body.records[0].date, today);
       assert.equal(res.body.records[6].date, addDays(today, -6));

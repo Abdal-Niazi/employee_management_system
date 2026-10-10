@@ -68,10 +68,10 @@ export default function MemberScreen() {
         </Card>
 
         <Card title="Last 7 days">
-          {attendance.map((record) => (
+          {attendance.records.map((record) => (
             <View key={record.date} style={styles.listRow}>
               <View style={styles.flex}>
-                <Text style={font.body}>{relativeDayLabel(record.date)}</Text>
+                <Text style={font.body}>{relativeDayLabel(record.date, attendance.today)}</Text>
                 <CorrectionTag correction={record.correction} />
               </View>
               <Text style={font.small}>{timeRange(record.checkIn, record.checkOut)}</Text>

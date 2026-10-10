@@ -58,6 +58,10 @@ Every screen shows real data from the backend; all calls go through `src/api/man
 | Correction requests | `POST /api/manager/attendance-corrections`, `GET /api/manager/attendance-corrections` |
 | Overview | today's attendance and pending leave |
 
+"Today" always comes from the server (`today` in the attendance answers), never from the phone's
+clock: the company day is Asia/Karachi, and a phone set to another timezone would otherwise ask for
+the wrong day — or one the server sees as the future.
+
 Attendance records come from employees checking in (the Employee app, still to be built); until
 then `npm run seed` in `backend/` adds six weeks of sample check-ins. **Managers can't change
 attendance.** On the Attendance tab, tapping a person (today and the 6 days before) opens a form to

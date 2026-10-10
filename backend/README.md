@@ -50,12 +50,14 @@ Manager routes (own team only):
 
 | Route | Does |
 |---|---|
-| `GET /api/manager/attendance?date=YYYY-MM-DD` | the team's day (default today; no future dates): `{ date, workday, shift, rows: [{ employee, record }], counts }` |
-| `GET /api/manager/team/:id/attendance?days=7` | one member's last 1–31 days, newest first |
+| `GET /api/manager/attendance?date=YYYY-MM-DD` | the team's day (default today; no future dates): `{ date, today, workday, shift, rows: [{ employee, record }], counts }` |
+| `GET /api/manager/team/:id/attendance?days=7` | one member's last 1–31 days, newest first: `{ employee, today, shift, records }` |
 | `POST /api/manager/attendance-corrections` | ask HR to fix a day: `{ employeeId, date, checkIn, checkOut?, reason }` (201) |
 | `GET /api/manager/attendance-corrections?status=` | the team's requests |
 
 A record is `{ date, status, checkIn, checkOut, correction: { id, status } | null, correctable }`.
+`today` is the company's own day, so an app shows that instead of the device's day, which may sit
+in another timezone.
 `correctable` says whether the manager may ask for a correction now. Requests are allowed for
 today and the 6 days before it, on work days, not on approved leave, and one waiting request per
 person and day (409 otherwise). Leaving out `checkOut` keeps the recorded check-out.

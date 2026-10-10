@@ -9,7 +9,7 @@ const TIME_KEYBOARD = Platform.select({ ios: "numbers-and-punctuation", default:
 
 // Asks HR to correct one person's day. Managers can't change attendance themselves;
 // nothing changes until an HR admin approves the request.
-export default function CorrectionModal({ target, date, submitting, error, onCancel, onSubmit }) {
+export default function CorrectionModal({ target, date, today, submitting, error, onCancel, onSubmit }) {
   return (
     <Modal visible={Boolean(target)} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.backdrop}>
@@ -20,6 +20,7 @@ export default function CorrectionModal({ target, date, submitting, error, onCan
             key={`${target.employee.id}:${date}`}
             target={target}
             date={date}
+            today={today}
             submitting={submitting}
             error={error}
             onCancel={onCancel}
@@ -50,7 +51,7 @@ function TimeField({ label, value, placeholder, onChangeText, editable }) {
   );
 }
 
-function CorrectionSheet({ target, date, submitting, error, onCancel, onSubmit }) {
+function CorrectionSheet({ target, date, today, submitting, error, onCancel, onSubmit }) {
   const { employee, record } = target;
   const [checkIn, setCheckIn] = useState(record.checkIn ?? "");
   const [checkOut, setCheckOut] = useState(record.checkOut ?? "");
@@ -78,7 +79,7 @@ function CorrectionSheet({ target, date, submitting, error, onCancel, onSubmit }
     <View style={styles.sheet}>
       <Text style={font.title}>Ask HR to correct</Text>
       <Text style={font.body}>
-        {fullName(employee)} · {relativeDayLabel(date)}
+        {fullName(employee)} · {relativeDayLabel(date, today)}
       </Text>
       <Text style={font.small}>{recorded}</Text>
 

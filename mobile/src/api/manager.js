@@ -1,4 +1,3 @@
-import { todayKey } from "../utils/date";
 import { request } from "./client";
 
 // Everything the manager screens need, all from the backend. It works out whose team
@@ -45,28 +44,34 @@ export async function decideLeave(id, decision, note) {
   return leaveRequest;
 }
 
-// GET /api/manager/attendance?date=YYYY-MM-DD
-// -> { date, workday, shift, rows: [{ employee, record }], counts }
+// GET /api/manager/attendance?date=YYYY-MM-DD, or no date for the company's own today.
+// -> { date, today, workday, shift, rows: [{ employee, record }], counts }
+// `today` is the company's day (Asia/Karachi), which can differ from the phone's day,
+// so the screens use it instead of the device clock.
 export async function getTeamAttendance(dateKey) {
-  const { date, workday, shift, rows, counts } = await request(managerUrl("/api/manager/attendance", { date: dateKey }));
-  return { date, workday, shift, rows, counts };
+  const { date, today, workday, shift, rows, counts } = await request(
+    managerUrl("/api/manager/attendance", { date: dateKey })
+  );
+  return { date, today, workday, shift, rows, counts };
 }
 
 // GET /api/manager/team/:id/attendance?days=7 -> newest day first
 export async function getMemberAttendance(member, days = 7) {
-  const { records } = await request(
+  const { today, records } = await request(
     managerUrl(`/api/manager/team/${encodeURIComponent(member.id)}/attendance`, { days })
   );
-  return records;
+  return { today, records };
 }
 
-// Today's attendance plus the leave requests waiting for the manager.
+// Today's attendance plus the leave requests waiting for the manager. Sending no date
+// lets the server pick its own today.
 export async function getOverview() {
-  const [today, pending] = await Promise.all([getTeamAttendance(todayKey()), getLeaveRequests("PENDING")]);
+  const [day, pending] = await Promise.all([getTeamAttendance(), getLeaveRequests("PENDING")]);
   return {
-    teamSize: today.rows.length,
-    workday: today.workday,
-    counts: today.counts,
+    date: day.date,
+    teamSize: day.rows.length,
+    workday: day.workday,
+    counts: day.counts,
     pending,
   };
 }

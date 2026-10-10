@@ -68,7 +68,9 @@ const VISIBLE_CORRECTIONS = { status: { in: ["PENDING", "APPROVED"] } };
 
 // Every team member's record for one day.
 const getTeamDay = async (managerId, dateKey, now = new Date()) => {
-  if (dateKey > todayKey(now)) {
+  const today = todayKey(now);
+
+  if (dateKey > today) {
     throw new AppError("date can't be in the future", 400);
   }
 
@@ -99,6 +101,8 @@ const getTeamDay = async (managerId, dateKey, now = new Date()) => {
 
   return {
     date: dateKey,
+    // The company's own day, so the app never has to trust the phone's timezone.
+    today,
     workday: !isWeekend(dateKey),
     shift: SHIFT,
     rows: results,
@@ -138,7 +142,7 @@ const getMemberHistory = async (managerId, employeeId, days, now = new Date()) =
     });
   });
 
-  return { employee: toEmployeeDto(employee), shift: SHIFT, records };
+  return { employee: toEmployeeDto(employee), today, shift: SHIFT, records };
 };
 
 // ---------- Correction requests ----------

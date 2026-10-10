@@ -28,8 +28,8 @@ export function formatDay(key) {
   });
 }
 
-export function relativeDayLabel(key) {
-  const today = todayKey();
+// `today` should be the company's day from the server; the device's day is only a fallback.
+export function relativeDayLabel(key, today = todayKey()) {
   if (key === today) return "Today";
   if (key === addDays(today, -1)) return "Yesterday";
   return formatDay(key);

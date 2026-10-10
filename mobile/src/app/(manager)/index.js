@@ -10,7 +10,7 @@ import { ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
 import { useAsync } from "../../hooks/useAsync";
 import { colors, font, radius, spacing } from "../../theme";
-import { formatDay, todayKey } from "../../utils/date";
+import { formatDay } from "../../utils/date";
 
 const BREAKDOWN = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "NOT_IN"];
 
@@ -38,7 +38,7 @@ export default function OverviewScreen() {
   if (status === "loading") return <LoadingState />;
   if (status === "error") return <ErrorState error={error} onRetry={reload} />;
 
-  const { teamSize, workday, counts, pending } = data;
+  const { date, teamSize, workday, counts, pending } = data;
 
   return (
     <ScrollView
@@ -47,7 +47,7 @@ export default function OverviewScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
     >
       <View>
-        <Text style={font.small}>{formatDay(todayKey())}</Text>
+        <Text style={font.small}>{formatDay(date)}</Text>
         <Text style={font.title}>Welcome back, {user.name || user.email.split("@")[0]}</Text>
       </View>
 
