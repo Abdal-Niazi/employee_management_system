@@ -31,11 +31,12 @@ export default function LeaveCard({ request, onApprove, onReject, showName = tru
         <Ionicons name="calendar-outline" size={16} color={colors.muted} />
         <Text style={font.body}>{leaveSummary(request)}</Text>
       </View>
-      <Text style={[font.body, styles.reason]}>“{request.reason}”</Text>
+      {/* The reason is optional */}
+      {request.reason ? <Text style={[font.body, styles.reason]}>“{request.reason}”</Text> : null}
 
-      <Text style={font.small}>
+      <Text style={[font.small, !request.reason && styles.noReason]}>
         Requested {timeAgo(request.requestedAt)}
-        {!pending && ` · ${statusInfo(request.status).label} ${timeAgo(request.decidedAt)}`}
+        {!pending && request.decidedAt && ` · ${statusInfo(request.status).label} ${timeAgo(request.decidedAt)}`}
       </Text>
       {request.decisionNote && <Text style={[font.small, styles.note]}>Note: {request.decisionNote}</Text>}
 
@@ -60,6 +61,7 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, gap: 2 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   reason: { color: colors.muted, fontStyle: "italic", marginVertical: spacing.sm },
+  noReason: { marginTop: spacing.sm },
   note: { marginTop: spacing.xs, color: colors.text },
   actions: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },
   action: { flex: 1 },

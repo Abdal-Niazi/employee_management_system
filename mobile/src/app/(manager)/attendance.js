@@ -14,6 +14,8 @@ import { addDays, formatDay, relativeDayLabel } from "../../utils/date";
 import { fullName } from "../../utils/status";
 
 const SUMMARY = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE"];
+// Only shown while someone is still expected today, so the numbers add up to the team.
+const summaryFor = (counts) => (counts.NOT_IN > 0 ? [...SUMMARY, "NOT_IN"] : SUMMARY);
 
 function describe(record, shift) {
   switch (record.status) {
@@ -24,6 +26,8 @@ function describe(record, shift) {
       return "Approved leave";
     case "ABSENT":
       return "No check-in";
+    case "INACTIVE":
+      return "Not active";
     case "NOT_IN":
       return `Shift starts ${shift.start}`;
     default:
@@ -140,7 +144,7 @@ export default function AttendanceScreen() {
             )}
             {data.workday && (
               <View style={styles.summary}>
-                {SUMMARY.map((key) => (
+                {summaryFor(data.counts).map((key) => (
                   <View key={key} style={styles.summaryItem}>
                     <Text style={styles.summaryValue}>{data.counts[key]}</Text>
                     <StatusPill status={key} />
@@ -230,7 +234,10 @@ const styles = StyleSheet.create({
   header: { gap: spacing.md, marginBottom: spacing.md },
   summary: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+    rowGap: spacing.md,
+    columnGap: spacing.sm,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,

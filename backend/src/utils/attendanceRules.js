@@ -25,10 +25,11 @@ const SHIFT = Object.freeze({ start, end, graceMinutes, timezone: TIMEZONE });
 // Managers can ask HR to correct today and the 6 days before it.
 const CORRECTION_WINDOW_DAYS = 7;
 
-const STATUSES = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "NOT_IN", "OFF"];
+const STATUSES = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "NOT_IN", "OFF", "INACTIVE"];
 
 // The status of one person's day. `record` is their Attendance row for that day, or null.
-const attendanceStatus = ({ dateKey, hireDateKey, onLeave, record, now = new Date() }) => {
+// `active` is false for an employee whose status isn't "active" (they left, or are on hold).
+const attendanceStatus = ({ dateKey, hireDateKey, onLeave, record, active = true, now = new Date() }) => {
   if (isWeekend(dateKey) || dateKey < hireDateKey) return "OFF";
   if (onLeave) return "ON_LEAVE";
 
@@ -36,6 +37,10 @@ const attendanceStatus = ({ dateKey, hireDateKey, onLeave, record, now = new Dat
     const late = toMinutes(toCompanyTime(record.checkIn)) > toMinutes(SHIFT.start) + SHIFT.graceMinutes;
     return late ? "LATE" : "PRESENT";
   }
+
+  // Not expected at work, so never counted as absent. (There is no leaving date, so this
+  // applies to every day without a check-in.)
+  if (!active) return "INACTIVE";
 
   // Nobody counts as absent until the shift is over.
   if (dateKey === todayKey(now) && nowMinutes(now) < toMinutes(SHIFT.end)) return "NOT_IN";

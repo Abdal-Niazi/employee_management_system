@@ -1,19 +1,23 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../auth/AuthContext";
+import OfflineScreen from "../components/OfflineScreen";
+import { LoadingState } from "../components/States";
 import { colors } from "../theme";
 
 // Each role only gets its own screens. When a guard turns false (sign in/out),
 // Expo Router moves to the first screen that is still available.
 function RootNavigator() {
-  const { user, restoring } = useAuth();
+  const { user, restoring, unreachable, retry, logout } = useAuth();
   // Only manager accounts get the team screens; the API refuses everyone else there too.
   const isManager = user?.role === "manager";
   // Employee accounts get their own check-in and attendance screens.
   const isEmployee = user?.role === "employee";
 
-  // Don't flash the login screen while a saved session is being checked.
-  if (restoring) return null;
+  // A spinner, not the login screen, while a saved session is being checked.
+  if (restoring) return <LoadingState />;
+  // No connection at start: keep the session and offer a retry instead of the login screen.
+  if (unreachable) return <OfflineScreen onRetry={retry} onSignOut={logout} />;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>

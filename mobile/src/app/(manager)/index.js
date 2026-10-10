@@ -40,6 +40,9 @@ export default function OverviewScreen() {
   if (status === "error") return <ErrorState error={error} onRetry={reload} />;
 
   const { date, teamSize, workday, counts, pending } = data;
+  const checkedIn = counts.PRESENT + counts.LATE;
+  // People expected at work today: not those on leave, inactive, or not hired yet.
+  const expected = checkedIn + counts.ABSENT + counts.NOT_IN;
 
   return (
     <ScrollView
@@ -60,10 +63,15 @@ export default function OverviewScreen() {
         <Stat
           icon="checkmark-circle-outline"
           label="Checked in today"
-          value={`${counts.PRESENT + counts.LATE}/${teamSize}`}
+          value={workday ? `${checkedIn}/${expected}` : "—"}
           onPress={() => router.navigate("/attendance")}
         />
-        <Stat icon="alarm-outline" label="Late today" value={counts.LATE} onPress={() => router.navigate("/attendance")} />
+        <Stat
+          icon="alarm-outline"
+          label="Late today"
+          value={workday ? counts.LATE : "—"}
+          onPress={() => router.navigate("/attendance")}
+        />
         <Stat icon="hourglass-outline" label="Pending leave" value={pending.length} onPress={() => router.navigate("/leave")} />
       </View>
 

@@ -1,9 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const { rateLimit } = require("express-rate-limit");
-
 const prisma = require("./utils/prisma");
+const { apiLimiter, loginLimiter } = require("./middleware/rateLimits");
 const authRoutes = require("./routes/authRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const managerRoutes = require("./routes/managerRoutes");
@@ -28,25 +27,6 @@ const corsOptions = {
     callback(null, allowed);
   },
 };
-
-// Limits per client IP. Behind a reverse proxy set TRUST_PROXY (e.g. 1) so the IP is the
-// real client's, not the proxy's.
-const limiter = (limit, windowMs, options = {}) =>
-  rateLimit({
-    windowMs,
-    limit,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-    message: { message: "Too many requests, please try again later" },
-    ...options,
-  });
-
-// Failed logins only, so a brute-force attempt is cut off without locking out real users.
-const loginLimiter = limiter(Number(process.env.LOGIN_RATE_LIMIT) || 10, 15 * 60 * 1000, {
-  skipSuccessfulRequests: true,
-  message: { message: "Too many failed sign-in attempts, please try again in 15 minutes" },
-});
-const apiLimiter = limiter(Number(process.env.API_RATE_LIMIT) || 300, 60 * 1000);
 
 const app = express();
 

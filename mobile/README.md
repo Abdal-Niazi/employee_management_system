@@ -49,8 +49,10 @@ development only.
 Sign-in calls `POST /api/auth/login`, and the server says which role the account has
 (`HR_ADMIN`, `MANAGER` or `EMPLOYEE`; create accounts with `npm run create-admin` in `backend/`).
 Managers see the manager screens, and only for their own team; employees see their own Today and
-My attendance tabs; HR admins see a placeholder until their screens are built. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
-out) and sent as a Bearer token. A 401 signs you out.
+My attendance tabs; HR admins see a placeholder until their screens are built. The JWT is kept in
+`expo-secure-store` on phones (in memory on web, so a reload signs you out) and sent as a Bearer
+token. A 401 signs you out. If the server can't be reached when the app starts, you stay signed in
+and get a "Can't connect to the server" screen with **Retry**.
 
 ## Where the data comes from
 
@@ -72,7 +74,8 @@ Attendance records come from people checking themselves in (below); `npm run see
 adds six weeks of sample check-ins for the past. **Managers can't change their team's attendance.** On the Attendance tab, tapping a person (today and the 6 days before) opens a form to
 ask HR for a correction with a reason. The day then shows "Correction waiting for HR"; only an HR
 approval changes it ("Corrected by HR"). **My correction requests** lists every request and HR's
-answer.
+answer. Team members whose record isn't active show as "Inactive" instead of "Absent", aren't
+counted, and can't be corrected from the app (HR handles them).
 
 ## Checking in (employees, and managers for themselves)
 
