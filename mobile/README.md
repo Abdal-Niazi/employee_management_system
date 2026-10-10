@@ -83,7 +83,7 @@ All calls go through `src/api/me.js` (`/api/me/...`, always the signed-in person
 
 | Screen | Backend |
 |---|---|
-| Today tab, and the card on the manager's Overview | `GET /api/me/attendance/today`, `POST /api/me/attendance/check-in`, `POST /api/me/attendance/check-out` |
+| Today tab, and the card on the manager's Overview | `GET /api/me/attendance/today`, `POST /api/me/device`, `POST /api/me/attendance/check-in`, `POST /api/me/attendance/check-out` |
 | My attendance (7 / 14 / 30 days) | `GET /api/me/attendance?days=` |
 
 `CheckInCard` shows **Check in**, then **Check out** (which asks once more, since a check-out can't
@@ -91,6 +91,18 @@ be undone), then "Done for today". The server's clock sets the times and the ser
 is allowed: on weekends, on approved leave, before the first day or for an employee who isn't
 active, the card shows the server's reason instead of a button. A forgotten or wrong time is fixed
 by the manager's correction request to HR.
+
+**Registered phone + fingerprint.** People check in from one registered phone. The first time,
+the card offers **Register this phone**: the phone asks for its fingerprint or face (or its PIN if
+those aren't set up), then saves the key the server sends in `expo-secure-store`
+(`src/auth/deviceKey.js`). Every check-in and check-out asks for the fingerprint again
+(`src/auth/confirmIdentity.js`) and sends the key; the phone does the fingerprint check itself, so
+nothing biometric leaves it. On another phone the card says it isn't the registered one, and HR
+resets a lost or replaced phone (`npm run reset-device -- <id>` in `backend/`). The web app can't
+check in at all.
+
+In Expo Go the fingerprint works on Android; iPhone Face ID needs a development build, so Expo Go
+asks for the iPhone's passcode instead. A phone without any screen lock can't check in.
 
 ## Layout
 
@@ -104,5 +116,5 @@ src/app/            screens (Expo Router — every file is a route)
   coming-soon.js    placeholder for roles without screens yet (HR admin)
 src/api/            client.js (fetch wrapper + Bearer token), auth.js, manager.js, me.js
 src/components/     shared UI
-src/auth/           session (AuthContext) and token storage
+src/auth/           session (AuthContext), token storage, the phone key and the fingerprint prompt
 ```

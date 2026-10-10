@@ -1,7 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { checkIn, checkOut, getMyDay } from "../api/me";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
+import { checkIn, checkOut, getMyDay, registerDevice } from "../api/me";
+import { useAuth } from "../auth/AuthContext";
+import { confirmIdentity } from "../auth/confirmIdentity";
+import { clearDeviceKey, loadDeviceKey, saveDeviceKey } from "../auth/deviceKey";
 import { useAsync } from "../hooks/useAsync";
 import { colors, font, radius, spacing } from "../theme";
 import { formatDay } from "../utils/date";
@@ -10,17 +13,42 @@ import Card from "./Card";
 import CorrectionTag from "./CorrectionTag";
 import StatusPill from "./StatusPill";
 
+const isWeb = Platform.OS === "web";
+
+function Notice({ icon = "information-circle-outline", color = colors.muted, children }) {
+  return (
+    <View style={styles.notice}>
+      <Ionicons name={icon} size={18} color={color} />
+      <Text style={[font.body, styles.flex]}>{children}</Text>
+    </View>
+  );
+}
+
 // The signed-in person's own day: check in, check out, or why neither is possible. Shown on the
-// employee's Today tab and on the manager's Overview. The server's clock sets the times, and the
-// server decides what is allowed, so the buttons only follow canCheckIn / canCheckOut.
+// employee's Today tab and on the manager's Overview. Check-in only works from the person's one
+// registered phone, after its fingerprint/face (or PIN) prompt; the server's clock sets the
+// times, and the server decides what is allowed, so the buttons only follow its answers.
 export default function CheckInCard({ title = "Your attendance today" }) {
-  const { status, data, error, reload, revalidate } = useAsync(getMyDay);
+  const { user } = useAuth();
+  const accountId = user.id;
+
+  const load = useCallback(async () => {
+    const [day, deviceKey] = await Promise.all([getMyDay(), loadDeviceKey(accountId)]);
+    // HR reset this person's phone: the old key is useless now, so forget it here as well.
+    if (!day.deviceRegistered && deviceKey) {
+      await clearDeviceKey(accountId);
+      return { ...day, deviceKey: null };
+    }
+    return { ...day, deviceKey };
+  }, [accountId]);
+
+  const { status, data, error, reload, revalidate } = useAsync(load);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [actionError, setActionError] = useState(null);
 
   // After an action (or a refusal, e.g. already checked in on another phone) reload the day,
-  // so the card always shows what the server has.
+  // so the card always shows what the server has. Cancelling the fingerprint prompt says nothing.
   const act = async (action) => {
     setBusy(true);
     setActionError(null);
@@ -28,11 +56,30 @@ export default function CheckInCard({ title = "Your attendance today" }) {
       await action();
       setConfirming(false);
     } catch (e) {
-      setActionError(e.message);
+      if (!e.cancelled) setActionError(e.message);
     }
     await revalidate();
     setBusy(false);
   };
+
+  const registerThisPhone = () =>
+    act(async () => {
+      await confirmIdentity("Confirm it's you to register this phone");
+      const { key } = await registerDevice(Platform.OS);
+      await saveDeviceKey(accountId, key);
+    });
+
+  const doCheckIn = () =>
+    act(async () => {
+      await confirmIdentity("Confirm it's you to check in");
+      await checkIn(data.deviceKey);
+    });
+
+  const doCheckOut = () =>
+    act(async () => {
+      await confirmIdentity("Confirm it's you to check out");
+      await checkOut(data.deviceKey);
+    });
 
   if (status === "loading") {
     return (
@@ -51,8 +98,11 @@ export default function CheckInCard({ title = "Your attendance today" }) {
     );
   }
 
-  const { today, workday, shift, record, canCheckIn, canCheckOut, notice } = data;
+  const { today, workday, shift, record, canCheckIn, canCheckOut, notice, deviceRegistered, deviceKey } = data;
   const done = Boolean(record.checkIn && record.checkOut);
+  // The day allows an action; whether this phone may do it is checked separately.
+  const wantsAction = canCheckIn || canCheckOut;
+  const onRegisteredPhone = !isWeb && deviceRegistered && Boolean(deviceKey);
 
   return (
     <Card title={title} right={<StatusPill status={record.status} />}>
@@ -68,24 +118,37 @@ export default function CheckInCard({ title = "Your attendance today" }) {
       )}
       <CorrectionTag correction={record.correction} />
 
-      {notice && !record.checkIn && (
-        <View style={styles.notice}>
-          <Ionicons name="information-circle-outline" size={18} color={colors.muted} />
-          <Text style={[font.body, styles.flex]}>{notice}</Text>
-        </View>
+      {notice && !record.checkIn && <Notice>{notice}</Notice>}
+
+      {/* Where check-in is allowed from */}
+      {isWeb && wantsAction && (
+        <Notice icon="phone-portrait-outline">Check-in works only in the EMS app on your registered phone.</Notice>
+      )}
+      {!isWeb && !deviceRegistered && (
+        <>
+          <Notice icon="phone-portrait-outline">
+            You check in from one registered phone. Register this one to start; it asks for your fingerprint or face.
+          </Notice>
+          <Button
+            title="Register this phone"
+            icon="finger-print"
+            loading={busy}
+            onPress={registerThisPhone}
+            style={styles.action}
+          />
+        </>
+      )}
+      {!isWeb && deviceRegistered && !deviceKey && (
+        <Notice icon="alert-circle-outline" color={colors.warning}>
+          This isn&apos;t your registered phone. If you changed phones, ask HR to reset it.
+        </Notice>
       )}
 
-      {canCheckIn && (
-        <Button
-          title="Check in"
-          icon="log-in-outline"
-          loading={busy}
-          onPress={() => act(checkIn)}
-          style={styles.action}
-        />
+      {onRegisteredPhone && canCheckIn && (
+        <Button title="Check in" icon="finger-print" loading={busy} onPress={doCheckIn} style={styles.action} />
       )}
 
-      {canCheckOut && !confirming && (
+      {onRegisteredPhone && canCheckOut && !confirming && (
         <Button
           title="Check out"
           icon="log-out-outline"
@@ -97,7 +160,7 @@ export default function CheckInCard({ title = "Your attendance today" }) {
       )}
 
       {/* A check-out can't be undone (only HR can fix it), so it asks once more. */}
-      {canCheckOut && confirming && (
+      {onRegisteredPhone && canCheckOut && confirming && (
         <View style={styles.confirm}>
           <Text style={font.body}>Check out now? This ends your day.</Text>
           <View style={styles.row}>
@@ -108,22 +171,15 @@ export default function CheckInCard({ title = "Your attendance today" }) {
               onPress={() => setConfirming(false)}
               style={styles.flex}
             />
-            <Button
-              title="Check out"
-              icon="log-out-outline"
-              loading={busy}
-              onPress={() => act(checkOut)}
-              style={styles.flex}
-            />
+            <Button title="Check out" icon="finger-print" loading={busy} onPress={doCheckOut} style={styles.flex} />
           </View>
         </View>
       )}
 
       {done && (
-        <View style={styles.notice}>
-          <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-          <Text style={[styles.doneText, styles.flex]}>Done for today</Text>
-        </View>
+        <Notice icon="checkmark-circle" color={colors.success}>
+          Done for today
+        </Notice>
       )}
 
       {actionError && <Text style={styles.error}>{actionError}</Text>}
@@ -143,7 +199,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.bg,
   },
-  doneText: { color: colors.success, fontWeight: "600" },
   action: { marginTop: spacing.md },
   confirm: { gap: spacing.sm, marginTop: spacing.md },
   row: { flexDirection: "row", gap: spacing.md },
