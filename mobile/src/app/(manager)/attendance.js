@@ -2,9 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { getTeamAttendance } from "../../api/manager";
-import { SHIFT } from "../../api/mock";
 import Avatar from "../../components/Avatar";
-import SampleDataBadge from "../../components/SampleDataBadge";
 import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
 import { useAsync } from "../../hooks/useAsync";
@@ -30,7 +28,7 @@ function describe(record) {
   }
 }
 
-function DateNav({ date, onChange }) {
+function DateNav({ date, shift, onChange }) {
   const isToday = date === todayKey();
   const label = relativeDayLabel(date);
   const subtitle = label === formatDay(date) ? "" : `${formatDay(date)} · `;
@@ -46,7 +44,8 @@ function DateNav({ date, onChange }) {
       <View style={styles.dateLabel}>
         <Text style={font.heading}>{label}</Text>
         <Text style={font.small}>
-          {subtitle}Shift {SHIFT.start}–{SHIFT.end}
+          {subtitle}
+          {shift ? `Shift ${shift.start}–${shift.end}` : ""}
         </Text>
       </View>
       <Pressable
@@ -80,7 +79,6 @@ export default function AttendanceScreen() {
         onRefresh={refresh}
         ListHeaderComponent={
           <View style={styles.header}>
-            <SampleDataBadge />
             {!isWeekend(date) && (
               <View style={styles.summary}>
                 {SUMMARY.map((key) => (
@@ -118,7 +116,7 @@ export default function AttendanceScreen() {
 
   return (
     <View style={styles.screen}>
-      <DateNav date={date} onChange={setDate} />
+      <DateNav date={date} shift={data?.shift} onChange={setDate} />
       {body}
     </View>
   );

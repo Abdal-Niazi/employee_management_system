@@ -46,17 +46,19 @@ the manager screens, and only for their own team; HR admins see a placeholder un
 are built. The JWT is kept in `expo-secure-store` on phones (in memory on web, so a reload signs you
 out) and sent as a Bearer token. A 401 signs you out.
 
-## What is real and what is sample data
+## Where the data comes from
 
-| Screen | Data | Backend endpoint that will replace the sample |
-|---|---|---|
-| My Team, member details | **Real** — `GET /api/manager/team`, `GET /api/manager/team/:id` (employees whose `managerId` is the manager) | — |
-| Leave approvals, leave history | **Real** — `GET /api/manager/leave-requests?status=`, `GET /api/manager/team/:id/leave-requests`, `PATCH /api/manager/leave-requests/:id` | — |
-| Attendance (team, member last 7 days) | Sample, but real approved leave shows as "On leave" | `GET /api/manager/attendance?date=YYYY-MM-DD` |
-| Overview | Team size and pending leave real, attendance sample | — |
+Every manager screen reads real data from `/api/manager`, through `src/api/manager.js`:
 
-Screens with sample data show a yellow **Sample data** badge. All data access goes through
-`src/api/manager.js` — swap a function's body for a `request()` call when its endpoint exists.
+| Screen | Endpoints |
+|---|---|
+| My Team, member details | `GET /api/manager/team`, `GET /api/manager/team/:id` (employees whose `managerId` is the manager) |
+| Leave approvals, leave history | `GET /api/manager/leave-requests?status=`, `GET /api/manager/team/:id/leave-requests`, `PATCH /api/manager/leave-requests/:id` |
+| Attendance (team, member last 7 days) | `GET /api/manager/attendance?date=YYYY-MM-DD`, `GET /api/manager/team/:id/attendance?days=7` |
+| Overview | team, pending leave and today's attendance counts from the endpoints above |
+
+Attendance is recorded by HR admins (`PUT /api/attendance`); a day with no check-in is worked out
+as weekend, on leave, not in yet or absent. HR admin screens use `src/api/hr.js` (`/api/employees`).
 
 ## Layout
 
@@ -66,7 +68,7 @@ src/app/            screens (Expo Router — every file is a route)
   (manager)/        bottom tabs: Overview, My Team, Attendance, Leave
   member/[id].js    team member details
   coming-soon.js    placeholder for roles without screens yet
-src/api/            client.js (fetch wrapper + Bearer token), auth.js, manager.js, mock.js
+src/api/            client.js (fetch wrapper + Bearer token), auth.js, manager.js, hr.js
 src/components/     shared UI
 src/auth/           session (AuthContext) and token storage
 ```

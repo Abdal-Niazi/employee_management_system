@@ -1,9 +1,6 @@
-import { todayKey } from "../utils/date";
 import { request } from "./client";
-import * as mock from "./mock";
 
-// Everything the manager screens need. Team and leave data are real; attendance
-// is sample data (see mock.js) until GET /api/manager/attendance exists.
+// Everything the manager screens need, all from /api/manager.
 // The backend works out whose team it is from the signed-in manager account.
 
 function managerUrl(path, params = {}) {
@@ -47,32 +44,22 @@ export async function decideLeave(id, decision, note) {
   return leaveRequest;
 }
 
-const approvedOnly = (leave) => leave.filter((r) => r.status === "APPROVED");
-
-// Sample, but people on real approved leave show as "On leave".
-// Later: GET /api/manager/attendance?date=YYYY-MM-DD
-export async function getTeamAttendance(dateKey) {
-  const [team, approved] = await Promise.all([getTeam(), getLeaveRequests("APPROVED")]);
-  await mock.delay();
-  const rows = mock.teamAttendance(team, dateKey, approved);
-  return { rows, counts: mock.summarize(rows.map((r) => r.record)) };
+// Real: GET /api/manager/attendance?date=YYYY-MM-DD (no date = today on the server)
+// -> { date, shift, rows: [{ employee, record }], counts }
+export function getTeamAttendance(dateKey) {
+  return request(managerUrl("/api/manager/attendance", { date: dateKey }));
 }
 
-// Sample. `leave` is the member's real leave history (from getMemberLeave).
-// Later: GET /api/manager/team/:id/attendance?days=7
-export async function getMemberAttendance(member, days = 7, leave = []) {
-  await mock.delay();
-  return mock.memberAttendance(member, days, approvedOnly(leave));
+// Real: GET /api/manager/team/:id/attendance?days=7 (newest first)
+export async function getMemberAttendance(member, days = 7) {
+  const { attendance } = await request(
+    managerUrl(`/api/manager/team/${encodeURIComponent(member.id)}/attendance`, { days })
+  );
+  return attendance;
 }
 
-// Team size and pending leave are real; today's attendance is sample.
+// Today's counts plus pending leave for the overview screen.
 export async function getOverview() {
-  const [team, leave] = await Promise.all([getTeam(), getLeaveRequests()]);
-  await mock.delay();
-  const today = mock.teamAttendance(team, todayKey(), approvedOnly(leave));
-  return {
-    teamSize: team.length,
-    counts: mock.summarize(today.map((r) => r.record)),
-    pending: leave.filter((r) => r.status === "PENDING"),
-  };
+  const [team, leave, today] = await Promise.all([getTeam(), getLeaveRequests("PENDING"), getTeamAttendance()]);
+  return { teamSize: team.length, counts: today.counts, pending: leave };
 }
