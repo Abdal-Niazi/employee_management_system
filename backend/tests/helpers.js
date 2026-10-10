@@ -69,4 +69,4 @@ const login = async (email) => {
   return { Authorization: `Bearer ${res.body.token}` };
 };
 
-module.exports = { app, prisma, request, PASSWORD, resetDatabase, seedFixtures, login };
+module.exports = { app, prisma, request, PASSWORD, resetDatabase, seedFixtures, login, account };
