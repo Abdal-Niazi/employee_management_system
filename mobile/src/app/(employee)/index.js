@@ -1,9 +1,10 @@
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getMyProfile } from "../../api/me";
+import { getMyAttendance, getMyProfile } from "../../api/me";
 import Avatar from "../../components/Avatar";
 import Card from "../../components/Card";
 import { ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
+import TodayCard from "../../components/TodayCard";
 import { useAsync } from "../../hooks/useAsync";
 import { colors, font, spacing } from "../../theme";
 import { formatIsoDate } from "../../utils/date";
@@ -18,12 +19,19 @@ function DetailRow({ label, value }) {
   );
 }
 
+// The profile and today's attendance, which the Today card needs.
+async function loadHome() {
+  const [employee, [today]] = await Promise.all([getMyProfile(), getMyAttendance(1)]);
+  return { employee, today };
+}
+
 export default function ProfileScreen() {
-  const { status, data: employee, error, reload, refresh, refreshing } = useAsync(getMyProfile);
+  const { status, data, error, reload, refresh, revalidate, refreshing } = useAsync(loadHome);
 
   if (status === "loading") return <LoadingState />;
   if (status === "error") return <ErrorState error={error} onRetry={reload} />;
 
+  const { employee, today } = data;
   const { manager } = employee;
 
   return (
@@ -32,6 +40,8 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
     >
+      <TodayCard today={today} onChange={revalidate} />
+
       <Card>
         <View style={styles.profile}>
           <Avatar firstName={employee.firstName} lastName={employee.lastName} size={64} />

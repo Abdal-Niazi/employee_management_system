@@ -15,6 +15,17 @@ export async function getMyAttendance(days = 14) {
   return attendance;
 }
 
+// Today's check-in and check-out, at the server's time. Each returns today's record.
+export async function checkIn() {
+  const { record } = await request("/api/me/check-in", { method: "POST" });
+  return record;
+}
+
+export async function checkOut() {
+  const { record } = await request("/api/me/check-out", { method: "POST" });
+  return record;
+}
+
 export async function getMyLeave() {
   const { leaveRequests } = await request("/api/me/leave-requests");
   return leaveRequests;
