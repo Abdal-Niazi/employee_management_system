@@ -59,7 +59,8 @@ Every manager screen reads real data from `/api/manager`, through `src/api/manag
 
 Attendance is recorded by HR admins (`PUT /api/attendance`); a day with no check-in is worked out
 as weekend, on leave, not in yet or absent. HR admin screens use `src/api/hr.js` (`/api/employees`,
-`/api/attendance`).
+`/api/attendance`, `/api/leave-requests`). HR sees every employee's leave and can approve or reject any
+request, which is how leave gets decided for people who have no manager.
 
 Employee screens read `/api/me` through `src/api/me.js`:
 

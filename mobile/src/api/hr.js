@@ -34,6 +34,23 @@ export async function deleteEmployee(id) {
   await request(`/api/employees/${id}`, { method: "DELETE" });
 }
 
+// Leave: HR admins see everyone's requests and can decide any of them (managers decide their team's).
+
+// status: PENDING, APPROVED or REJECTED (no status = all)
+export async function getAllLeave(status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const { leaveRequests } = await request(`/api/leave-requests${query}`);
+  return leaveRequests;
+}
+
+export async function decideLeaveAsHr(id, decision, note) {
+  const { leaveRequest } = await request(`/api/leave-requests/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: decision, note: note?.trim() || null }),
+  });
+  return leaveRequest;
+}
+
 // Attendance (HR admins record it; managers read their team's through /api/manager).
 
 // Everyone's record for one day: { date, shift, rows: [{ employee, record }], counts }

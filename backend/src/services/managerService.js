@@ -32,7 +32,27 @@ const getTeamMember = async (managerId, id) => {
 // ---------- Leave requests ----------
 
 const leaveInclude = {
-  employee: { select: { id: true, employeeId: true, firstName: true, lastName: true, department: true } },
+  employee: {
+    select: {
+      id: true,
+      employeeId: true,
+      firstName: true,
+      lastName: true,
+      department: true,
+      manager: { select: { firstName: true, lastName: true } },
+    },
+  },
+  decidedBy: { select: { firstName: true, lastName: true } },
+  decidedByAdmin: { select: { name: true } },
+};
+
+const personName = (person) => `${person.firstName} ${person.lastName}`.trim();
+
+// Who decided it: the manager, or "Name (HR)" when an HR admin did.
+const deciderName = (row) => {
+  if (row.decidedBy) return personName(row.decidedBy);
+  if (row.decidedByAdmin) return `${row.decidedByAdmin.name} (HR)`;
+  return null;
 };
 
 // startDate/endDate are DATE columns, read back as UTC midnight.
@@ -45,6 +65,7 @@ const toLeaveDto = (row) => ({
   employeeDbId: row.employee.id,
   employeeName: `${row.employee.firstName} ${row.employee.lastName}`.trim(),
   department: row.employee.department,
+  managerName: row.employee.manager ? personName(row.employee.manager) : null,
   type: row.type,
   startDate: toDateKey(row.startDate),
   endDate: toDateKey(row.endDate),
@@ -54,6 +75,7 @@ const toLeaveDto = (row) => ({
   requestedAt: row.createdAt.toISOString(),
   decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
   decisionNote: row.decisionNote,
+  decidedBy: deciderName(row),
 });
 
 // Pending first (soonest leave first), then decided (most recent decision first).
