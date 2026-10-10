@@ -41,7 +41,9 @@ const pickCorrection = (corrections) =>
 
 // One person's day as the app shows it.
 const toRecord = ({ employee, dateKey, row, onLeave, corrections, now }) => {
-  const status = attendanceStatus({ dateKey, hireDateKey: toDateKey(employee.hireDate), onLeave, record: row, now });
+  const active = employee.status === "active";
+  const hireDateKey = toDateKey(employee.hireDate);
+  const status = attendanceStatus({ dateKey, hireDateKey, onLeave, record: row, active, now });
   const correction = pickCorrection(corrections);
 
   return {
@@ -49,8 +51,9 @@ const toRecord = ({ employee, dateKey, row, onLeave, corrections, now }) => {
     status,
     ...times(row?.checkIn, row?.checkOut),
     correction: correction && { id: correction.id, status: correction.status },
-    // Whether the manager may ask HR to fix this day now
+    // Whether the manager may ask HR to fix this day now (never for someone who isn't active)
     correctable:
+      active &&
       !["OFF", "ON_LEAVE"].includes(status) &&
       dateKey >= windowStart(now) &&
       dateKey <= todayKey(now) &&
@@ -225,6 +228,9 @@ const requestCorrection = async (managerId, { employeeId, date: dateKey, checkIn
   const employee = await managerService.getTeamMember(managerId, employeeId);
   if (!employee) {
     throw new AppError("Team member not found", 404);
+  }
+  if (employee.status !== "active") {
+    throw new AppError("This employee isn't active, so HR handles their attendance directly", 409);
   }
 
   const today = todayKey(now);

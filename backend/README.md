@@ -43,6 +43,7 @@ A day's status, checked in this order:
 | `OFF` | Saturday, Sunday, or before the hire date |
 | `ON_LEAVE` | an approved leave request covers the day |
 | `PRESENT` / `LATE` | checked in; late if more than the grace minutes after the shift start |
+| `INACTIVE` | no check-in, and the employee's `status` isn't `active` (left or on hold), so they aren't expected at work |
 | `NOT_IN` | no check-in yet today, and the shift hasn't ended |
 | `ABSENT` | no check-in |
 
@@ -59,7 +60,7 @@ A record is `{ date, status, checkIn, checkOut, correction: { id, status } | nul
 `today` is the company's own day, so an app shows that instead of the device's day, which may sit
 in another timezone.
 `correctable` says whether the manager may ask for a correction now. Requests are allowed for
-today and the 6 days before it, on work days, not on approved leave, and one waiting request per
+active employees, for today and the 6 days before it, on work days, not on approved leave, and one waiting request per
 person and day (409 otherwise). Leaving out `checkOut` keeps the recorded check-out.
 
 ### For the HR app: attendance corrections
@@ -105,10 +106,12 @@ run). The script refuses to run against `DATABASE_URL`.
   Run `npm run migrate:deploy` on each release.
 - Keep `.env` out of git (it is ignored). Run with a process manager (systemd, pm2, Docker) that
   restarts the server; it shuts down cleanly on `SIGTERM`.
+- Never run `npm run seed` there: it refuses when `NODE_ENV=production`, because it adds sample data.
 
-Built in: security headers (helmet), a CORS allow list, 100 kB JSON bodies, 10 failed sign-ins per
-15 minutes and 300 requests per minute per IP, bcrypt passwords, 8-hour tokens, role checks on
-every route, and input validation with length limits.
+Built in: security headers (helmet), a CORS allow list, 100 kB JSON bodies, bcrypt passwords,
+8-hour tokens, role checks on every route, input validation with length limits, and rate limits:
+10 failed sign-ins per 15 minutes per IP **and email** (so typos on one office Wi-Fi don't lock
+everyone out), and 300 requests per minute per signed-in user (per IP when not signed in).
 
 ### `npm audit`
 

@@ -11,6 +11,7 @@ const {
   todayKey,
 } = require("../src/utils/companyTime");
 const { attendanceStatus } = require("../src/utils/attendanceRules");
+const attendanceService = require("../src/services/attendanceService");
 
 // A fixed past week: Tuesday 10 March 2026 is a work day, Saturday 14 March is not.
 const TUESDAY = "2026-03-10";
@@ -58,6 +59,13 @@ describe("status rules", () => {
     assert.equal(attendanceStatus({ ...base, record: { checkIn: at(TUESDAY, "08:40") } }), "PRESENT");
     assert.equal(attendanceStatus({ ...base, record: { checkIn: at(TUESDAY, "09:05") } }), "PRESENT");
     assert.equal(attendanceStatus({ ...base, record: { checkIn: at(TUESDAY, "09:06") } }), "LATE");
+  });
+
+  test("someone who isn't active is never absent", () => {
+    assert.equal(attendanceStatus({ ...base, active: false }), "INACTIVE");
+    assert.equal(attendanceStatus({ ...base, active: false, dateKey: "2026-03-09" }), "INACTIVE");
+    assert.equal(attendanceStatus({ ...base, active: false, record: { checkIn: at(TUESDAY, "09:00") } }), "PRESENT");
+    assert.equal(attendanceStatus({ ...base, active: false, dateKey: SATURDAY }), "OFF");
   });
 
   test("no check-in is 'not in yet' until the shift ends, then absent", () => {
@@ -250,7 +258,13 @@ describe("attendance API", () => {
 
       assert.equal((await requestCorrection(managerA, correction({ date: addDays(today, 1) }))).status, 400);
       assert.equal((await requestCorrection(managerA, correction({ date: weekendDay }))).status, 400);
-      assert.equal((await requestCorrection(managerA, correction({ date: today, checkIn: "23:58", checkOut: "23:59" }))).status, 400);
+
+      // Times later than now, checked with a fixed clock (noon) so this passes at any hour.
+      const later = { employeeId: data.a1.id, date: workday, checkIn: "13:00", checkOut: "14:00", reason: "Typo" };
+      await assert.rejects(attendanceService.requestCorrection(data.managerA.id, later, at(workday, "12:00")), {
+        statusCode: 400,
+        message: /later than now/,
+      });
 
       await approvedLeave(data.a1.id, otherWorkday);
       const onLeave = await requestCorrection(managerA, correction({ date: otherWorkday }));
@@ -377,5 +391,30 @@ describe("attendance API", () => {
     const res = await requestCorrection(managerA, correction({ employeeId: newcomer.id }));
     assert.equal(res.status, 400);
     assert.match(res.body.message, /before the employee was hired/);
+  });
+
+  test("someone who isn't active shows as inactive, isn't counted and can't be corrected", async () => {
+    const leaver = await prisma.employee.create({
+      data: {
+        employeeId: "A-4",
+        firstName: "Asma",
+        lastName: "Test",
+        email: "a-4@example.com",
+        hireDate: asDbDate("2024-01-15"),
+        status: "inactive",
+        managerId: data.managerA.id,
+      },
+    });
+
+    const res = await request(app).get(`/api/manager/attendance?date=${workday}`).set(managerA);
+    const record = res.body.rows.find((row) => row.employee.id === leaver.id).record;
+    assert.equal(record.status, "INACTIVE");
+    assert.equal(record.correctable, false);
+    assert.equal(res.body.counts.INACTIVE, 1);
+    assert.equal(res.body.counts.ABSENT + res.body.counts.NOT_IN, 0);
+
+    const refused = await requestCorrection(managerA, correction({ employeeId: leaver.id }));
+    assert.equal(refused.status, 409);
+    assert.match(refused.body.message, /isn't active/);
   });
 });

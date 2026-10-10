@@ -3,6 +3,12 @@
 // attendance only fills days that have no record yet, so it is safe to run again.
 require("dotenv").config({ quiet: true });
 
+// Sample data is only for development: never fill a real company's database with it.
+if (process.env.NODE_ENV === "production") {
+  console.error("Refusing to seed: NODE_ENV is production. npm run seed only adds sample data for development.");
+  process.exit(1);
+}
+
 const prisma = require("../src/utils/prisma");
 const companyTime = require("../src/utils/companyTime");
 const { SHIFT } = require("../src/utils/attendanceRules");
@@ -30,19 +36,10 @@ function hash(text) {
   return h >>> 0;
 }
 
-// Days are handled as local "YYYY-MM-DD" keys.
+// Days are "YYYY-MM-DD" keys in the company's timezone, the same as the API uses, so the sample
+// data lines up with the app whatever timezone this computer is set to.
+const { addDays, asDbDate: asDate, fromCompanyTime, isWeekend, toDateKey, todayKey } = companyTime;
 const pad = (n) => String(n).padStart(2, "0");
-const toKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-const fromKey = (key) => {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, m - 1, d);
-};
-const addDays = (key, days) => {
-  const date = fromKey(key);
-  date.setDate(date.getDate() + days);
-  return toKey(date);
-};
-const isWeekend = (key) => [0, 6].includes(fromKey(key).getDay());
 const nextWeekday = (key) => {
   let day = key;
   while (isWeekend(day)) day = addDays(day, 1);
@@ -54,14 +51,12 @@ const endAfterWorkingDays = (start, days) => {
   for (let left = days - 1; left > 0; left--) end = nextWeekday(addDays(end, 1));
   return end;
 };
-// DATE columns hold the calendar day as UTC midnight.
-const asDate = (key) => new Date(`${key}T00:00:00.000Z`);
 
 function makeRequest(employee, n, { startOffset, days, status, requestedOffset }) {
   const h = hash(`${employee.employeeId}#${n}`);
   const type = LEAVE_TYPES[h % LEAVE_TYPES.length];
-  const today = toKey(new Date());
-  const hired = employee.hireDate.toISOString().slice(0, 10);
+  const today = todayKey();
+  const hired = toDateKey(employee.hireDate);
   const startDate = nextWeekday(addDays(today, startOffset));
   const requested = addDays(today, requestedOffset);
   const requestedKey = requested < hired ? hired : requested;
@@ -74,8 +69,9 @@ function makeRequest(employee, n, { startOffset, days, status, requestedOffset }
     days,
     reason: REASONS[type][h % REASONS[type].length],
     status,
-    createdAt: fromKey(requestedKey),
-    decidedAt: status === "PENDING" ? null : fromKey(addDays(requestedKey, 1)),
+    // Asked mid-morning, decided the next morning (company time)
+    createdAt: fromCompanyTime(requestedKey, "10:00"),
+    decidedAt: status === "PENDING" ? null : fromCompanyTime(addDays(requestedKey, 1), "11:00"),
     decidedById: status === "PENDING" ? null : employee.managerId,
     decisionNote: status === "REJECTED" ? "Overlaps with a release week" : null,
   };
@@ -83,8 +79,8 @@ function makeRequest(employee, n, { startOffset, days, status, requestedOffset }
 
 function sampleLeave(employee) {
   const h = hash(employee.employeeId);
-  const today = toKey(new Date());
-  const hired = employee.hireDate.toISOString().slice(0, 10);
+  const today = todayKey();
+  const hired = toDateKey(employee.hireDate);
 
   // An upcoming request waiting for the manager.
   const rows = [
