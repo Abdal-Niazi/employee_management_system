@@ -5,10 +5,9 @@ import { ROLES, useAuth } from "../auth/AuthContext";
 import Button from "../components/Button";
 import { colors, font, spacing } from "../theme";
 
-// HR Admin and Employee screens are built on other branches; this app slice is the Manager role.
+// HR Admin screens are built on another branch; this build has the Manager and Employee screens.
 const OWNER_BRANCH = {
   hr_admin: "feature/hr-admin",
-  employee: "feature/employee",
 };
 
 export default function ComingSoonScreen() {
@@ -21,7 +20,8 @@ export default function ComingSoonScreen() {
         <Text style={font.title}>{ROLES[user.role]} screens</Text>
         <Text style={[font.body, styles.text]}>
           The {ROLES[user.role]} part of the app is being built on{" "}
-          <Text style={styles.code}>{OWNER_BRANCH[user.role]}</Text>. This build contains the Manager screens.
+          <Text style={styles.code}>{OWNER_BRANCH[user.role]}</Text>. This build contains the Manager and Employee
+          screens.
         </Text>
         <Button title="Sign out" icon="log-out-outline" variant="outline" onPress={logout} />
       </View>

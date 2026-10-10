@@ -5,6 +5,7 @@ import { getOverview } from "../../api/manager";
 import { useAuth } from "../../auth/AuthContext";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
+import CheckInCard from "../../components/CheckInCard";
 import { leaveSummary } from "../../components/LeaveCard";
 import { ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
@@ -50,6 +51,9 @@ export default function OverviewScreen() {
         <Text style={font.small}>{formatDay(date)}</Text>
         <Text style={font.title}>Welcome back, {user.name || user.email.split("@")[0]}</Text>
       </View>
+
+      {/* Managers are employees too: they check themselves in here. */}
+      <CheckInCard />
 
       <View style={styles.stats}>
         <Stat icon="people-outline" label="Team members" value={teamSize} onPress={() => router.navigate("/team")} />

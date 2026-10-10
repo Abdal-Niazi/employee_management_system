@@ -12,7 +12,7 @@ export const ROLES = {
 const AuthContext = createContext(null);
 
 // The server decides the role; its values map to the app's role keys.
-const SERVER_ROLES = { HR_ADMIN: "hr_admin", MANAGER: "manager" };
+const SERVER_ROLES = { HR_ADMIN: "hr_admin", MANAGER: "manager", EMPLOYEE: "employee" };
 const toUser = (admin) => ({ ...admin, role: SERVER_ROLES[admin.role] });
 
 export function AuthProvider({ children }) {

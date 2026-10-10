@@ -9,6 +9,8 @@ function RootNavigator() {
   const { user, restoring } = useAuth();
   // Only manager accounts get the team screens; the API refuses everyone else there too.
   const isManager = user?.role === "manager";
+  // Employee accounts get their own check-in and attendance screens.
+  const isEmployee = user?.role === "employee";
 
   // Don't flash the login screen while a saved session is being checked.
   if (restoring) return null;
@@ -31,7 +33,11 @@ function RootNavigator() {
         />
       </Stack.Protected>
 
-      <Stack.Protected guard={Boolean(user) && !isManager}>
+      <Stack.Protected guard={isEmployee}>
+        <Stack.Screen name="(employee)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={Boolean(user) && !isManager && !isEmployee}>
         <Stack.Screen name="coming-soon" />
       </Stack.Protected>
     </Stack>
