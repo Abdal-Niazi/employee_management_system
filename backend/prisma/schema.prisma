@@ -36,22 +36,25 @@ model Employee {
 }
 
 model LeaveRequest {
-  id           Int       @id @default(autoincrement())
-  employeeId   Int
-  employee     Employee  @relation("EmployeeLeave", fields: [employeeId], references: [id], onDelete: Cascade)
-  type         String // Annual, Sick, Casual
-  startDate    DateTime  @db.Date
-  endDate      DateTime  @db.Date
-  days         Int // working days
-  reason       String?
-  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  decidedAt    DateTime?
+  id               Int       @id @default(autoincrement())
+  employeeId       Int
+  employee         Employee  @relation("EmployeeLeave", fields: [employeeId], references: [id], onDelete: Cascade)
+  type             String // Annual, Sick, Casual
+  startDate        DateTime  @db.Date
+  endDate          DateTime  @db.Date
+  days             Int // working days
+  reason           String?
+  status           String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  decidedAt        DateTime?
   // The manager (an employee) who approved or rejected it
-  decidedById  Int?
-  decidedBy    Employee? @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
-  decisionNote String?
-  createdAt    DateTime  @default(now()) // when it was requested
-  updatedAt    DateTime  @updatedAt
+  decidedById      Int?
+  decidedBy        Employee? @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  // Or the HR admin account that decided it (HR can decide any request, e.g. for people with no manager)
+  decidedByAdminId Int?
+  decidedByAdmin   Admin?    @relation("LeaveDecidedByAdmin", fields: [decidedByAdminId], references: [id], onDelete: SetNull)
+  decisionNote     String?
+  createdAt        DateTime  @default(now()) // when it was requested
+  updatedAt        DateTime  @updatedAt
 
   @@index([employeeId, status])
 }
@@ -81,14 +84,15 @@ enum Role {
 
 // Staff accounts that can log in. Existing accounts are HR admins.
 model Admin {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
+  id           Int            @id @default(autoincrement())
+  email        String         @unique
   name         String
   passwordHash String
-  role         Role      @default(HR_ADMIN)
+  role         Role           @default(HR_ADMIN)
   // For MANAGER and EMPLOYEE accounts: the employee they are
-  employeeId   Int?      @unique
-  employee     Employee? @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  employeeId   Int?           @unique
+  employee     Employee?      @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
+  decidedLeave LeaveRequest[] @relation("LeaveDecidedByAdmin")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
