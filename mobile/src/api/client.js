@@ -10,9 +10,11 @@ const TIMEOUT_MS = 10_000;
 const INSECURE_API = !__DEV__ && !API_URL.startsWith("https://");
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, errors) {
     super(message);
     this.status = status;
+    // Per-field messages from a 422 ([{ field, message }]), when the server sends them.
+    this.errors = errors;
   }
 }
 
@@ -65,7 +67,7 @@ export async function request(path, options = {}) {
     // A 401 for the token still in use means it expired or was revoked — sign out. A late 401
     // from a request sent before a new login must not sign that new login out.
     if (response.status === 401 && sentToken && sentToken === authToken) onUnauthorized?.();
-    throw new ApiError(body.message || `Request failed (${response.status})`, response.status);
+    throw new ApiError(body.message || `Request failed (${response.status})`, response.status, body.errors);
   }
 
   return body;

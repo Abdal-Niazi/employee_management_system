@@ -1,5 +1,6 @@
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/AppError");
+const serializable = require("../utils/serializable");
 const managerService = require("./managerService");
 const {
   addDays,
@@ -67,10 +68,11 @@ const countStatuses = (records) =>
 const approvedLeaveOn = (date) => ({ status: "APPROVED", startDate: { lte: date }, endDate: { gte: date } });
 const VISIBLE_CORRECTIONS = { status: { in: ["PENDING", "APPROVED"] } };
 
-// ---------- Viewing attendance (managers) ----------
+// ---------- Viewing a day (managers and HR admins) ----------
 
-// Every team member's record for one day.
-const getTeamDay = async (managerId, dateKey, now = new Date()) => {
+// The records of everyone `loadPeople` returns for one day. `scope` limits the queries to
+// those people (a manager's team), and `view` shapes each record for the screen asking.
+const dayFor = async ({ loadPeople, scope, view }, dateKey, now) => {
   const today = todayKey(now);
 
   if (dateKey > today) {
@@ -78,28 +80,29 @@ const getTeamDay = async (managerId, dateKey, now = new Date()) => {
   }
 
   const date = asDbDate(dateKey);
-  const inTeam = { employee: { managerId } };
 
-  const [team, rows, leave, corrections] = await Promise.all([
-    managerService.getTeam(managerId),
-    prisma.attendance.findMany({ where: { date, ...inTeam } }),
-    prisma.leaveRequest.findMany({ where: { ...approvedLeaveOn(date), ...inTeam } }),
+  const [people, rows, leave, corrections] = await Promise.all([
+    loadPeople(),
+    prisma.attendance.findMany({ where: { date, ...scope } }),
+    prisma.leaveRequest.findMany({ where: { ...approvedLeaveOn(date), ...scope } }),
     prisma.attendanceCorrection.findMany({
-      where: { date, ...VISIBLE_CORRECTIONS, ...inTeam },
+      where: { date, ...VISIBLE_CORRECTIONS, ...scope },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
-  const results = team.map((employee) => ({
+  const results = people.map((employee) => ({
     employee: toEmployeeDto(employee),
-    record: toRecord({
-      employee,
-      dateKey,
-      row: rows.find((r) => r.employeeId === employee.id) ?? null,
-      onLeave: leave.some((l) => l.employeeId === employee.id),
-      corrections: corrections.filter((c) => c.employeeId === employee.id),
-      now,
-    }),
+    record: view(
+      toRecord({
+        employee,
+        dateKey,
+        row: rows.find((r) => r.employeeId === employee.id) ?? null,
+        onLeave: leave.some((l) => l.employeeId === employee.id),
+        corrections: corrections.filter((c) => c.employeeId === employee.id),
+        now,
+      })
+    ),
   }));
 
   return {
@@ -112,6 +115,14 @@ const getTeamDay = async (managerId, dateKey, now = new Date()) => {
     counts: countStatuses(results.map((r) => r.record)),
   };
 };
+
+// Every team member's record for one day.
+const getTeamDay = (managerId, dateKey, now = new Date()) =>
+  dayFor(
+    { loadPeople: () => managerService.getTeam(managerId), scope: { employee: { managerId } }, view: (r) => r },
+    dateKey,
+    now
+  );
 
 // One person's last `days` days, newest first. Used by the manager's member page and by
 // the person's own history.
@@ -254,7 +265,135 @@ const getMyHistory = async (employee, days, now = new Date()) => {
   return { today, shift: SHIFT, records: records.map(ownRecord) };
 };
 
+// ---------- HR admins: everyone's day, changed directly ----------
+
+// What the history says when HR leaves no note
+const HR_REASON = "Changed by HR";
+const HR_REMOVED_REASON = "Check-in removed by HR";
+
+// HR's view of a record: whether HR can write this day (`correctable` is for managers). Weekends,
+// days before the hire date and approved leave always show as off or on leave, so they can't be.
+const hrRecord = ({ correctable, ...record }) => ({
+  ...record,
+  editable: !["OFF", "ON_LEAVE"].includes(record.status),
+});
+
+// Everyone's record for one day, except people who left (status "terminated").
+const getAllDay = (dateKey, now = new Date()) =>
+  dayFor(
+    {
+      loadPeople: () =>
+        prisma.employee.findMany({
+          where: { status: { not: "terminated" } },
+          orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+        }),
+      scope: {},
+      view: hrRecord,
+    },
+    dateKey,
+    now
+  );
+
+// One person's record for one day, as HR sees it.
+const hrRecordFor = async (employee, dateKey, now) => {
+  const date = asDbDate(dateKey);
+  const [row, leave, corrections] = await Promise.all([
+    findOwnRow(employee, date),
+    findApprovedLeave(employee, date),
+    prisma.attendanceCorrection.findMany({
+      where: { employeeId: employee.id, date, ...VISIBLE_CORRECTIONS },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  return hrRecord(toRecord({ employee, dateKey, row, onLeave: Boolean(leave), corrections, now }));
+};
+
+const findEmployee = async (id) => {
+  const employee = await prisma.employee.findUnique({ where: { id } });
+  if (!employee) throw new AppError("Employee not found", 404);
+  return employee;
+};
+
+// The change HR made, saved like an approved correction (with the times before it) so it can be
+// traced, and shown as "Corrected by HR" like one. `fixed` null means the check-in was removed.
+const saveHrChange = (tx, adminId, { employeeId, date, current, fixed, note }) =>
+  tx.attendanceCorrection.create({
+    data: {
+      employeeId,
+      date,
+      checkIn: fixed?.checkIn ?? null,
+      checkOut: fixed?.checkOut ?? null,
+      reason: note || (fixed ? HR_REASON : HR_REMOVED_REASON),
+      status: "APPROVED",
+      source: "HR",
+      decidedById: adminId,
+      decidedAt: new Date(),
+      previousCheckIn: current?.checkIn ?? null,
+      previousCheckOut: current?.checkOut ?? null,
+    },
+  });
+
+// An HR admin writes or fixes one person's check-in and check-out ("HH:MM", company time).
+// Unlike a manager's request, an empty check-out means none.
+const recordDay = async (adminId, { employeeId, date: dateKey, checkIn, checkOut, note }, now = new Date()) => {
+  const employee = await findEmployee(employeeId);
+
+  if (dateKey > todayKey(now)) {
+    throw new AppError("Attendance can't be recorded for a day that hasn't happened yet", 400);
+  }
+  if (isWeekend(dateKey)) {
+    throw new AppError("There is no shift on weekends", 400);
+  }
+  if (dateKey < toDateKey(employee.hireDate)) {
+    throw new AppError("This day is before the employee was hired", 400);
+  }
+  if (dateKey === todayKey(now) && toMinutes(checkOut ?? checkIn) > nowMinutes(now)) {
+    throw new AppError("Times can't be later than now", 400);
+  }
+
+  const date = asDbDate(dateKey);
+  if (await findApprovedLeave(employee, date)) {
+    throw new AppError("This employee is on approved leave that day", 409);
+  }
+
+  const fixed = {
+    checkIn: fromCompanyTime(dateKey, checkIn),
+    checkOut: checkOut ? fromCompanyTime(dateKey, checkOut) : null,
+  };
+
+  // Serializable, so the saved "before" times are the ones this change really replaced.
+  await serializable(async (tx) => {
+    const day = { employeeId_date: { employeeId, date } };
+    const current = await tx.attendance.findUnique({ where: day });
+
+    await saveHrChange(tx, adminId, { employeeId, date, current, fixed, note });
+    await tx.attendance.upsert({ where: day, create: { employeeId, date, ...fixed }, update: fixed });
+  });
+
+  return hrRecordFor(employee, dateKey, now);
+};
+
+// An HR admin removes one person's check-in for a day (e.g. made by mistake). Kept in the history.
+const clearDay = async (adminId, { employeeId, date: dateKey, note }, now = new Date()) => {
+  const employee = await findEmployee(employeeId);
+  const date = asDbDate(dateKey);
+
+  await serializable(async (tx) => {
+    const day = { employeeId_date: { employeeId, date } };
+    const current = await tx.attendance.findUnique({ where: day });
+    if (!current) throw new AppError("No check-in is recorded for that day", 404);
+
+    await saveHrChange(tx, adminId, { employeeId, date, current, fixed: null, note });
+    await tx.attendance.delete({ where: day });
+  });
+
+  return hrRecordFor(employee, dateKey, now);
+};
+
 // ---------- Correction requests ----------
+
+// Requests come from managers; HR's own changes are kept in the same table but aren't requests.
+const REQUESTS = { source: "MANAGER" };
 
 const correctionInclude = {
   employee: { select: { id: true, employeeId: true, firstName: true, lastName: true, department: true } },
@@ -316,10 +455,10 @@ const listCorrections = async (where) => {
 
 // A manager's view: only their team's requests.
 const listTeamCorrections = (managerId, status) =>
-  listCorrections({ employee: { managerId }, ...(status && { status }) });
+  listCorrections({ ...REQUESTS, employee: { managerId }, ...(status && { status }) });
 
 // HR's view: every request.
-const listAllCorrections = (status) => listCorrections(status ? { status } : {});
+const listAllCorrections = (status) => listCorrections({ ...REQUESTS, ...(status && { status }) });
 
 const getCorrection = async (id) => {
   const row = await prisma.attendanceCorrection.findUnique({ where: { id }, include: correctionInclude });
@@ -432,6 +571,9 @@ module.exports = {
   checkIn,
   checkOut,
   getMyHistory,
+  getAllDay,
+  recordDay,
+  clearDay,
   listTeamCorrections,
   listAllCorrections,
   requestCorrection,

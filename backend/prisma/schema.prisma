@@ -43,22 +43,25 @@ model Employee {
 }
 
 model LeaveRequest {
-  id           Int       @id @default(autoincrement())
-  employeeId   Int
-  employee     Employee  @relation("EmployeeLeave", fields: [employeeId], references: [id], onDelete: Cascade)
-  type         String // Annual, Sick, Casual
-  startDate    DateTime  @db.Date
-  endDate      DateTime  @db.Date
-  days         Int // working days
-  reason       String?
-  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  decidedAt    DateTime?
+  id               Int       @id @default(autoincrement())
+  employeeId       Int
+  employee         Employee  @relation("EmployeeLeave", fields: [employeeId], references: [id], onDelete: Cascade)
+  type             String // Annual, Sick, Casual
+  startDate        DateTime  @db.Date
+  endDate          DateTime  @db.Date
+  days             Int // working days
+  reason           String?
+  status           String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  decidedAt        DateTime?
   // The manager (an employee) who approved or rejected it
-  decidedById  Int?
-  decidedBy    Employee? @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
-  decisionNote String?
-  createdAt    DateTime  @default(now()) // when it was requested
-  updatedAt    DateTime  @updatedAt
+  decidedById      Int?
+  decidedBy        Employee? @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  // Or the HR admin account that decided it (HR can decide any request, e.g. for people with no manager)
+  decidedByAdminId Int?
+  decidedByAdmin   Admin?    @relation("LeaveDecidedByAdmin", fields: [decidedByAdminId], references: [id], onDelete: SetNull)
+  decisionNote     String?
+  createdAt        DateTime  @default(now()) // when it was requested
+  updatedAt        DateTime  @updatedAt
 
   @@index([employeeId, status])
 }
@@ -78,17 +81,20 @@ model Attendance {
   @@index([date])
 }
 
-// A manager's request to fix a day's times. Only an HR admin can approve it.
+// A change to a day's times: a manager's request that only an HR admin can approve, or a change
+// an HR admin made directly (saved already approved, with no requester), so every change is traced.
 model AttendanceCorrection {
   id               Int       @id @default(autoincrement())
   employeeId       Int
   employee         Employee  @relation("CorrectionFor", fields: [employeeId], references: [id], onDelete: Cascade)
   date             DateTime  @db.Date
-  // The times the manager says are right
-  checkIn          DateTime
+  // The times that are right. No check-in means HR removed the day's check-in.
+  checkIn          DateTime?
   checkOut         DateTime?
   reason           String
   status           String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  // MANAGER: a manager's request. HR: an HR admin changed the day directly.
+  source           String    @default("MANAGER")
   // The manager (an employee) who asked
   requestedById    Int?
   requestedBy      Employee? @relation("CorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
@@ -123,8 +129,10 @@ model Admin {
   // For MANAGER and EMPLOYEE accounts: the employee they are (a manager's team hangs off it)
   employeeId          Int?                   @unique
   employee            Employee?              @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
-  // Attendance corrections this HR admin approved or rejected
+  // Attendance corrections this HR admin approved, rejected or made
   correctionDecisions AttendanceCorrection[] @relation("CorrectionDecider")
+  // Leave requests this HR admin approved or rejected
+  decidedLeave        LeaveRequest[]         @relation("LeaveDecidedByAdmin")
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 }

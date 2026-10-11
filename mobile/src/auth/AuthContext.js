@@ -3,12 +3,6 @@ import { getCurrentAdmin, loginRequest } from "../api/auth";
 import { ApiError, setAuthToken, setUnauthorizedHandler } from "../api/client";
 import { clearToken, loadToken, saveToken } from "./tokenStorage";
 
-export const ROLES = {
-  manager: "Manager",
-  hr_admin: "HR Admin",
-  employee: "Employee",
-};
-
 const AuthContext = createContext(null);
 
 // The server decides the role; its values map to the app's role keys.

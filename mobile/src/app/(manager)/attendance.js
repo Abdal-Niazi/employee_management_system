@@ -3,83 +3,18 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { getTeamAttendance, requestCorrection } from "../../api/manager";
+import AttendanceSummary from "../../components/AttendanceSummary";
 import Avatar from "../../components/Avatar";
 import CorrectionModal from "../../components/CorrectionModal";
 import CorrectionTag from "../../components/CorrectionTag";
+import DayNav from "../../components/DayNav";
+import LinkRow from "../../components/LinkRow";
 import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
 import { useAsync } from "../../hooks/useAsync";
 import { colors, font, radius, spacing } from "../../theme";
-import { addDays, formatDay, relativeDayLabel } from "../../utils/date";
+import { describeRecord } from "../../utils/attendance";
 import { fullName } from "../../utils/status";
-
-const SUMMARY = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE"];
-// Only shown while someone is still expected today, so the numbers add up to the team.
-const summaryFor = (counts) => (counts.NOT_IN > 0 ? [...SUMMARY, "NOT_IN"] : SUMMARY);
-
-function describe(record, shift) {
-  switch (record.status) {
-    case "PRESENT":
-    case "LATE":
-      return `In ${record.checkIn} · Out ${record.checkOut ?? "—"}`;
-    case "ON_LEAVE":
-      return "Approved leave";
-    case "ABSENT":
-      return "No check-in";
-    case "INACTIVE":
-      return "Not active";
-    case "NOT_IN":
-      return `Shift starts ${shift.start}`;
-    default:
-      return "No shift";
-  }
-}
-
-// `today` is the company's day, sent by the server, so a phone in another timezone
-// still shows the right day and can't ask for one that hasn't happened yet.
-function DateNav({ date, today, shift, onChange }) {
-  const isToday = !today || date === today;
-  const label = relativeDayLabel(date, today);
-  const subtitle = label === formatDay(date) ? "" : formatDay(date);
-  const details = [subtitle, shift && `Shift ${shift.start}–${shift.end}`].filter(Boolean).join(" · ");
-  return (
-    <View style={styles.dateNav}>
-      <Pressable
-        accessibilityLabel="Previous day"
-        onPress={() => onChange(addDays(date, -1))}
-        style={({ pressed }) => [styles.navButton, pressed && { opacity: 0.6 }]}
-      >
-        <Ionicons name="chevron-back" size={20} color={colors.text} />
-      </Pressable>
-      <View style={styles.dateLabel}>
-        <Text style={font.heading}>{label}</Text>
-        {details ? <Text style={font.small}>{details}</Text> : null}
-      </View>
-      <Pressable
-        accessibilityLabel="Next day"
-        disabled={isToday}
-        onPress={() => onChange(addDays(date, 1))}
-        style={({ pressed }) => [styles.navButton, (pressed || isToday) && { opacity: 0.35 }]}
-      >
-        <Ionicons name="chevron-forward" size={20} color={colors.text} />
-      </Pressable>
-    </View>
-  );
-}
-
-function RequestsLink({ onPress }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
-    >
-      <Ionicons name="document-text-outline" size={18} color={colors.primary} />
-      <Text style={styles.linkText}>My correction requests</Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-    </Pressable>
-  );
-}
 
 export default function AttendanceScreen() {
   const router = useRouter();
@@ -142,17 +77,12 @@ export default function AttendanceScreen() {
                 <Text style={styles.toastText}>{toast}</Text>
               </View>
             )}
-            {data.workday && (
-              <View style={styles.summary}>
-                {summaryFor(data.counts).map((key) => (
-                  <View key={key} style={styles.summaryItem}>
-                    <Text style={styles.summaryValue}>{data.counts[key]}</Text>
-                    <StatusPill status={key} />
-                  </View>
-                ))}
-              </View>
-            )}
-            <RequestsLink onPress={() => router.push("/corrections")} />
+            {data.workday && <AttendanceSummary counts={data.counts} />}
+            <LinkRow
+              icon="document-text-outline"
+              label="My correction requests"
+              onPress={() => router.push("/corrections")}
+            />
             {data.workday && canCorrect && (
               <Text style={font.small}>Wrong time? Tap a person to ask HR for a correction.</Text>
             )}
@@ -179,7 +109,7 @@ export default function AttendanceScreen() {
               <Text style={styles.name} numberOfLines={1}>
                 {fullName(item.employee)}
               </Text>
-              <Text style={font.small}>{describe(item.record, data.shift)}</Text>
+              <Text style={font.small}>{describeRecord(item.record, data.shift)}</Text>
               <CorrectionTag correction={item.record.correction} />
             </View>
             <StatusPill status={item.record.status} />
@@ -191,7 +121,7 @@ export default function AttendanceScreen() {
 
   return (
     <View style={styles.screen}>
-      {shown && <DateNav date={shown} today={today} shift={data?.shift} onChange={setDate} />}
+      {shown && <DayNav date={shown} today={today} shift={data?.shift} onChange={setDate} />}
       {body}
 
       <CorrectionModal
@@ -210,54 +140,8 @@ export default function AttendanceScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  dateNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  navButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateLabel: { flex: 1, alignItems: "center" },
   content: { padding: spacing.lg, flexGrow: 1 },
   header: { gap: spacing.md, marginBottom: spacing.md },
-  summary: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
-    rowGap: spacing.md,
-    columnGap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-  },
-  summaryItem: { alignItems: "center", gap: spacing.xs },
-  summaryValue: { fontSize: 20, fontWeight: "700", color: colors.text },
-  link: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  linkText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.text },
   toast: {
     flexDirection: "row",
     alignItems: "center",

@@ -6,9 +6,12 @@ import { colors } from "../../theme";
 const ICONS = {
   index: "today",
   history: "calendar",
+  leave: "airplane",
+  profile: "person",
 };
 
-// The Employee part of the app: today's check-in and the person's own attendance.
+// The Employee part of the app: today's check-in, the person's own attendance, their leave
+// requests and their profile.
 export default function EmployeeLayout() {
   return (
     <Tabs
@@ -23,7 +26,9 @@ export default function EmployeeLayout() {
       })}
     >
       <Tabs.Screen name="index" options={{ title: "Today" }} />
-      <Tabs.Screen name="history" options={{ title: "My attendance" }} />
+      <Tabs.Screen name="history" options={{ title: "My attendance", tabBarLabel: "Attendance" }} />
+      <Tabs.Screen name="leave" options={{ title: "My leave", tabBarLabel: "Leave" }} />
+      <Tabs.Screen name="profile" options={{ title: "My profile", tabBarLabel: "Profile" }} />
     </Tabs>
   );
 }

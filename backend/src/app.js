@@ -6,7 +6,9 @@ const { apiLimiter, loginLimiter } = require("./middleware/rateLimits");
 const authRoutes = require("./routes/authRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const managerRoutes = require("./routes/managerRoutes");
+const attendanceRoutes = require("./routes/attendanceRoutes");
 const correctionRoutes = require("./routes/correctionRoutes");
+const leaveRoutes = require("./routes/leaveRoutes");
 const meRoutes = require("./routes/meRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -42,7 +44,9 @@ app.use("/api/auth/login", loginLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/manager", managerRoutes);
+app.use("/api/attendance", attendanceRoutes);
 app.use("/api/attendance-corrections", correctionRoutes);
+app.use("/api/leave-requests", leaveRoutes);
 app.use("/api/me", meRoutes);
 
 app.get("/", (req, res) => {

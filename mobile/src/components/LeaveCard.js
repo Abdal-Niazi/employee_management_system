@@ -12,7 +12,7 @@ export function leaveSummary(request) {
   return `${formatRange(request.startDate, request.endDate)} · ${days}`;
 }
 
-export default function LeaveCard({ request, onApprove, onReject, showName = true }) {
+export default function LeaveCard({ request, onApprove, onReject, onCancel, showName = true, showManager = false }) {
   const pending = request.status === "PENDING";
 
   return (
@@ -34,11 +34,24 @@ export default function LeaveCard({ request, onApprove, onReject, showName = tru
       {/* The reason is optional */}
       {request.reason ? <Text style={[font.body, styles.reason]}>“{request.reason}”</Text> : null}
 
-      <Text style={[font.small, !request.reason && styles.noReason]}>
+      {showManager && (
+        <Text style={[font.small, !request.reason && styles.noReason, !request.managerName && styles.noManager]}>
+          {request.managerName ? `Manager: ${request.managerName}` : "No manager assigned, so HR decides"}
+        </Text>
+      )}
+
+      <Text style={[font.small, !request.reason && !showManager && styles.noReason]}>
         Requested {timeAgo(request.requestedAt)}
         {!pending && request.decidedAt && ` · ${statusInfo(request.status).label} ${timeAgo(request.decidedAt)}`}
+        {!pending && request.decidedBy ? ` by ${request.decidedBy}` : ""}
       </Text>
       {request.decisionNote && <Text style={[font.small, styles.note]}>Note: {request.decisionNote}</Text>}
+
+      {pending && onCancel && (
+        <View style={styles.actions}>
+          <Button title="Cancel request" icon="close" variant="danger" onPress={() => onCancel(request)} style={styles.action} />
+        </View>
+      )}
 
       {pending && onApprove && onReject && (
         <View style={styles.actions}>
@@ -62,6 +75,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   reason: { color: colors.muted, fontStyle: "italic", marginVertical: spacing.sm },
   noReason: { marginTop: spacing.sm },
+  noManager: { color: colors.warning, fontWeight: "600" },
   note: { marginTop: spacing.xs, color: colors.text },
   actions: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },
   action: { flex: 1 },

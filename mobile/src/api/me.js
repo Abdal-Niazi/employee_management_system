@@ -47,3 +47,26 @@ export async function getMyAttendance(days = 7) {
   const { today, shift, records } = await request(`/api/me/attendance?days=${encodeURIComponent(days)}`);
   return { today, shift, records };
 }
+
+// GET /api/me -> { ...employee, manager: { firstName, lastName, position, ... } | null }
+export async function getMyProfile() {
+  const { employee } = await request("/api/me");
+  return employee;
+}
+
+// GET /api/me/leave-requests -> { today, leaveRequests }, pending first
+export async function getMyLeave() {
+  const { today, leaveRequests } = await request("/api/me/leave-requests");
+  return { today, leaveRequests };
+}
+
+// { type: "Annual" | "Sick" | "Casual", startDate, endDate, reason }
+export async function requestLeave(data) {
+  const { leaveRequest } = await request("/api/me/leave-requests", { method: "POST", body: JSON.stringify(data) });
+  return leaveRequest;
+}
+
+// Only while the request is still pending.
+export async function cancelLeave(id) {
+  await request(`/api/me/leave-requests/${encodeURIComponent(id)}`, { method: "DELETE" });
+}

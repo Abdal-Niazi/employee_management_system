@@ -19,6 +19,8 @@ after(() => prisma.$disconnect());
 test("every API route needs a token", async () => {
   assert.equal((await request(app).get("/api/employees")).status, 401);
   assert.equal((await request(app).get("/api/manager/team")).status, 401);
+  assert.equal((await request(app).get("/api/me")).status, 401);
+  assert.equal((await request(app).get("/api/attendance")).status, 401);
   assert.equal((await request(app).patch("/api/manager/leave-requests/1").send({ status: "APPROVED" })).status, 401);
   assert.equal((await request(app).get("/api/manager/attendance")).status, 401);
   assert.equal((await request(app).get("/api/attendance-corrections")).status, 401);
@@ -76,4 +78,21 @@ test("a manager account without an employee is refused", async () => {
 
   assert.equal(res.status, 403);
   assert.match(res.body.message, /isn't linked to an employee/);
+});
+
+test("only EMPLOYEE and MANAGER accounts can use /api/me", async () => {
+  assert.equal((await request(app).get("/api/me").set(hr)).status, 403);
+  assert.equal((await request(app).get("/api/me/leave-requests").set(hr)).status, 403);
+  assert.equal((await request(app).get("/api/me").set(manager)).status, 200);
+  assert.equal((await request(app).get("/api/me").set(employee)).status, 200);
+});
+
+test("only HR admins see everyone's leave and attendance", async () => {
+  for (const who of [manager, employee]) {
+    assert.equal((await request(app).get("/api/leave-requests").set(who)).status, 403);
+    assert.equal((await request(app).patch("/api/leave-requests/1").set(who).send({ status: "APPROVED" })).status, 403);
+    assert.equal((await request(app).get("/api/attendance").set(who)).status, 403);
+  }
+  assert.equal((await request(app).get("/api/leave-requests").set(hr)).status, 200);
+  assert.equal((await request(app).get("/api/attendance").set(hr)).status, 200);
 });

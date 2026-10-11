@@ -11,7 +11,8 @@ function RootNavigator() {
   const { user, restoring, unreachable, retry, logout } = useAuth();
   // Only manager accounts get the team screens; the API refuses everyone else there too.
   const isManager = user?.role === "manager";
-  // Employee accounts get their own check-in and attendance screens.
+  const isHrAdmin = user?.role === "hr_admin";
+  // Employee accounts get their own check-in, attendance, leave and profile screens.
   const isEmployee = user?.role === "employee";
 
   // A spinner, not the login screen, while a saved session is being checked.
@@ -37,11 +38,20 @@ function RootNavigator() {
         />
       </Stack.Protected>
 
+      <Stack.Protected guard={isHrAdmin}>
+        <Stack.Screen name="(hr)" />
+        <Stack.Screen
+          name="attendance-requests"
+          options={{ headerShown: true, title: "Requests from managers", headerBackTitle: "Back" }}
+        />
+      </Stack.Protected>
+
       <Stack.Protected guard={isEmployee}>
         <Stack.Screen name="(employee)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={Boolean(user) && !isManager && !isEmployee}>
+      {/* Only for a role this version of the app doesn't know */}
+      <Stack.Protected guard={Boolean(user) && !isManager && !isHrAdmin && !isEmployee}>
         <Stack.Screen name="coming-soon" />
       </Stack.Protected>
     </Stack>

@@ -25,8 +25,10 @@ an employee account checks that employee in and out. One account per employee.
 | `POST /api/auth/login`, `GET /api/auth/me` | anyone / any signed-in account |
 | `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET`/`DELETE /:id/device` for the registered phone) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
+| `/api/attendance` (everyone's day; write, fix or remove a check-in) | `HR_ADMIN` |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
-| `/api/me/...` (own check-in, check-out, own attendance) | `EMPLOYEE`, `MANAGER`; always the signed-in account's own employee |
+| `/api/leave-requests` (everyone's leave, approve/reject any) | `HR_ADMIN` |
+| `/api/me/...` (own profile, check-in, check-out, attendance, leave) | `EMPLOYEE`, `MANAGER`; always the signed-in account's own employee |
 | `GET /health` | anyone; `{ "status": "ok" }` or 503 when the database is unreachable |
 
 ## Attendance
@@ -34,7 +36,8 @@ an employee account checks that employee in and out. One account per employee.
 Employees check themselves in and out (`/api/me`, below); managers do too, for their own days.
 `npm run seed` fills the last six weeks with sample check-ins, except **today** for anyone who has
 a login, since they check in themselves. Managers **can't change** their team's attendance: when a
-record is wrong they ask HR for a correction, and only an HR approval changes it.
+record is wrong they ask HR for a correction, and only an HR approval changes it. HR admins can
+also write, fix or remove anyone's day directly; every such change is kept in the history.
 
 One shift for everyone, Monday to Friday, set in `.env`: `SHIFT_START` (09:00), `SHIFT_END`
 (17:00), `LATE_GRACE_MINUTES` (5) and `COMPANY_TIMEZONE` (Asia/Karachi). Times in requests and
@@ -76,6 +79,14 @@ Own attendance (`EMPLOYEE` and `MANAGER` accounts, always the account's own empl
 | `POST /api/me/attendance/check-in` | header `X-Device-Key: <key>`; starts today's record at the server's time; returns the same object as today |
 | `POST /api/me/attendance/check-out` | header `X-Device-Key: <key>`; ends it; returns the same object |
 | `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` |
+| `GET /api/me` | own profile: `{ employee }`, with `manager` (or null) |
+| `GET /api/me/leave-requests` | own leave, pending first: `{ today, leaveRequests }` |
+| `POST /api/me/leave-requests` | `{ type: "Annual" \| "Sick" \| "Casual", startDate, endDate, reason? }`; 201 `{ leaveRequest }` |
+| `DELETE /api/me/leave-requests/:id` | cancels an own request while it is still pending (409 once decided) |
+
+Leave counts working days only (no weekends), covers at most 60 days, and is refused (409) when
+it overlaps a pending or approved request. The check and the save run in one Serializable
+transaction, so two requests sent at the same moment can't both pass.
 
 Check-in is refused on weekends and before the hire date (400), for an employee whose `status`
 isn't `active` (403), on approved leave (409), and a second time the same day (409). Check-out
@@ -120,8 +131,23 @@ record said before the change.
 decides a waiting request and returns `{ correction }`. Approving writes the requested times
 into the attendance record; rejecting changes nothing. A request can only be decided once (409).
 
-An HR screen needs: a list of waiting requests (name, day, before → requested times, reason,
-who asked), and Approve / Reject buttons with an optional note.
+The HR app shows these under **Attendance → Requests from managers**.
+
+### HR admins: attendance and leave
+
+| Route | Does |
+|---|---|
+| `GET /api/attendance?date=YYYY-MM-DD` | everyone's day except people who left (`terminated`): the same shape as the manager's, and each record has `editable` instead of `correctable` |
+| `PUT /api/attendance` | `{ employeeId, date, checkIn, checkOut?, note? }` writes or fixes the day ("HH:MM"; no `checkOut` means none); returns `{ record }` |
+| `DELETE /api/attendance/:employeeId/:date` | optional body `{ note }`; removes that day's check-in (404 if there is none); returns `{ record }` |
+| `GET /api/leave-requests?status=` | every employee's leave, with `managerName` and `decidedBy` |
+| `PATCH /api/leave-requests/:id` | `{ status, note? }` decides any pending request (409 once decided); `decidedBy` then reads "Name (HR)" |
+
+HR can't write a weekend, a day before the hire date, a day of approved leave or a future day, and
+today's times can't be later than now. Every HR change is saved as an already-approved correction
+(`source: "HR"`) with who made it, when, the times before and the note ("Changed by HR" or "Check-in
+removed by HR" without one), so managers and employees see "Corrected by HR". These history rows
+aren't requests, so they don't appear in the correction lists.
 
 ## Tests
 
