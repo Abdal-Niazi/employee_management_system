@@ -8,13 +8,14 @@ Express 5 + Prisma 7 + PostgreSQL API for the Employee Management System.
 npm install
 cp .env.example .env          # then fill in DATABASE_URL and JWT_SECRET
 npm run migrate:deploy        # create or update the tables
-npm run create-admin          # an HR_ADMIN account, or a MANAGER linked to an employee
+npm run create-admin          # an HR_ADMIN account, or a MANAGER / EMPLOYEE linked to an employee
 npm run seed                  # optional: sample leave requests
 npm start                     # http://localhost:5000
 ```
 
-`create-admin` asks for a role. A `MANAGER` account also needs the **database id** of the
-employee it belongs to; that manager then sees the employees whose `managerId` is that id.
+`create-admin` asks for a role. A `MANAGER` or `EMPLOYEE` account also needs the **employee ID**
+(the code shown in the app, such as `EMP001`) of the employee it belongs to. A manager then sees
+the employees whose `managerId` is that employee, and HR sets that by editing an employee.
 
 ## Who can do what
 
@@ -22,8 +23,20 @@ employee it belongs to; that manager then sees the employees whose `managerId` i
 |---|---|
 | `POST /api/auth/login`, `GET /api/auth/me` | anyone / any signed-in account |
 | `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete) | `HR_ADMIN` |
-| `/api/manager/...` (team, team member, leave requests, approve/reject) | `MANAGER`, own team only |
+| `/api/attendance` (a day's attendance for everyone, write, correct or remove a check-in) | `HR_ADMIN` |
+| `/api/leave-requests` (everyone's leave, approve or reject any pending request) | `HR_ADMIN` |
+| `/api/manager/...` (team, team member, the team's attendance, leave requests, approve/reject) | `MANAGER`, own team only |
+| `/api/me/...` (own profile, attendance, check in and out, leave requests, request or cancel leave) | `EMPLOYEE` and `MANAGER`, own data only |
 | `GET /health` | anyone; `{ "status": "ok" }` or 503 when the database is unreachable |
+
+## Attendance rules
+
+A saved check-in is a row per employee per day. A day without one is worked out when it is read:
+weekend or before the hire date is off, approved leave is on leave, a weekday that has not ended is
+not in yet, and a finished weekday is absent. The shift (09:00 to 17:00) and the 5 minute grace
+period for late are in `src/services/attendanceService.js`, and times use the server's clock.
+Employees check in and out themselves with `POST /api/me/check-in` and `/api/me/check-out`; HR can
+correct any day.
 
 ## Tests
 
