@@ -1,6 +1,5 @@
 const express = require("express");
 const employeeController = require("../controllers/employeeController");
-const deviceController = require("../controllers/deviceController");
 const validate = require("../middleware/validate");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
@@ -21,10 +20,5 @@ router.get("/:id", employeeController.getEmployeeById);
 router.patch("/:id", validate(updateEmployeeSchema), employeeController.updateEmployee);
 
 router.delete("/:id", employeeController.deleteEmployee);
-
-// A person's registered phone (they check in from it). Reset it when the phone is lost or replaced.
-router.get("/:id/device", deviceController.getDevice);
-
-router.delete("/:id/device", deviceController.resetDevice);
 
 module.exports = router;

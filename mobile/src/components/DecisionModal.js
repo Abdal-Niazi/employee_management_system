@@ -4,22 +4,9 @@ import { colors, font, radius, spacing } from "../theme";
 import Button from "./Button";
 import { leaveSummary } from "./LeaveCard";
 
-// The two lines under the title for a leave request.
-const leaveLines = (request) => [`${request.employeeName} · ${request.type} leave`, leaveSummary(request)];
-
-// Confirm step for approving/rejecting a request: leave by default, or anything else with its
-// own `what` ("correction") and `lines`. A custom modal rather than Alert.alert, which does
-// nothing on web.
-export default function DecisionModal({
-  request,
-  decision,
-  what = "leave",
-  lines = leaveLines,
-  submitting,
-  error,
-  onCancel,
-  onConfirm,
-}) {
+// Confirm step for approving/rejecting leave. A custom modal rather than
+// Alert.alert, which does nothing on web.
+export default function DecisionModal({ request, decision, submitting, error, onCancel, onConfirm }) {
   return (
     <Modal visible={Boolean(request)} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.backdrop}>
@@ -28,8 +15,7 @@ export default function DecisionModal({
           // Keyed by request so the note starts empty for every new decision.
           <DecisionSheet
             key={`${request.id}:${decision}`}
-            what={what}
-            lines={lines(request)}
+            request={request}
             approving={decision === "APPROVED"}
             submitting={submitting}
             error={error}
@@ -42,14 +28,16 @@ export default function DecisionModal({
   );
 }
 
-function DecisionSheet({ what, lines: [main, detail], approving, submitting, error, onCancel, onConfirm }) {
+function DecisionSheet({ request, approving, submitting, error, onCancel, onConfirm }) {
   const [note, setNote] = useState("");
 
   return (
     <View style={styles.sheet}>
-      <Text style={font.title}>{approving ? `Approve ${what}?` : `Reject ${what}?`}</Text>
-      <Text style={font.body}>{main}</Text>
-      <Text style={font.small}>{detail}</Text>
+      <Text style={font.title}>{approving ? "Approve leave?" : "Reject leave?"}</Text>
+      <Text style={font.body}>
+        {request.employeeName} · {request.type} leave
+      </Text>
+      <Text style={font.small}>{leaveSummary(request)}</Text>
 
       <TextInput
         value={note}
@@ -57,7 +45,6 @@ function DecisionSheet({ what, lines: [main, detail], approving, submitting, err
         placeholder={approving ? "Add a note (optional)" : "Reason for rejecting (optional)"}
         placeholderTextColor={colors.muted}
         multiline
-        maxLength={500} // the server's limit
         style={styles.input}
         editable={!submitting}
       />

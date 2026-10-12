@@ -1,7 +1,7 @@
 import { request } from "./client";
 
-// Everything the manager screens need, all from the backend. It works out whose team
-// it is from the signed-in manager account.
+// Everything the manager screens need, all from /api/manager.
+// The backend works out whose team it is from the signed-in manager account.
 
 function managerUrl(path, params = {}) {
   const query = Object.entries(params)
@@ -44,50 +44,22 @@ export async function decideLeave(id, decision, note) {
   return leaveRequest;
 }
 
-// GET /api/manager/attendance?date=YYYY-MM-DD, or no date for the company's own today.
-// -> { date, today, workday, shift, rows: [{ employee, record }], counts }
-// `today` is the company's day (Asia/Karachi), which can differ from the phone's day,
-// so the screens use it instead of the device clock.
-export async function getTeamAttendance(dateKey) {
-  const { date, today, workday, shift, rows, counts } = await request(
-    managerUrl("/api/manager/attendance", { date: dateKey })
-  );
-  return { date, today, workday, shift, rows, counts };
+// Real: GET /api/manager/attendance?date=YYYY-MM-DD (no date = today on the server)
+// -> { date, shift, rows: [{ employee, record }], counts }
+export function getTeamAttendance(dateKey) {
+  return request(managerUrl("/api/manager/attendance", { date: dateKey }));
 }
 
-// GET /api/manager/team/:id/attendance?days=7 -> newest day first
+// Real: GET /api/manager/team/:id/attendance?days=7 (newest first)
 export async function getMemberAttendance(member, days = 7) {
-  const { today, records } = await request(
+  const { attendance } = await request(
     managerUrl(`/api/manager/team/${encodeURIComponent(member.id)}/attendance`, { days })
   );
-  return { today, records };
+  return attendance;
 }
 
-// Today's attendance plus the leave requests waiting for the manager. Sending no date
-// lets the server pick its own today.
+// Today's counts plus pending leave for the overview screen.
 export async function getOverview() {
-  const [day, pending] = await Promise.all([getTeamAttendance(), getLeaveRequests("PENDING")]);
-  return {
-    date: day.date,
-    teamSize: day.rows.length,
-    workday: day.workday,
-    counts: day.counts,
-    pending,
-  };
-}
-
-// Managers can't change attendance; they ask HR to correct a day.
-// POST /api/manager/attendance-corrections  { employeeId, date, checkIn, checkOut, reason }
-export async function requestCorrection({ employeeId, date, checkIn, checkOut, reason }) {
-  const { correction } = await request(managerUrl("/api/manager/attendance-corrections"), {
-    method: "POST",
-    body: JSON.stringify({ employeeId, date, checkIn, checkOut: checkOut || null, reason: reason.trim() }),
-  });
-  return correction;
-}
-
-// GET /api/manager/attendance-corrections?status=PENDING (no status = all)
-export async function getCorrections(status) {
-  const { corrections } = await request(managerUrl("/api/manager/attendance-corrections", { status }));
-  return corrections;
+  const [team, leave, today] = await Promise.all([getTeam(), getLeaveRequests("PENDING"), getTeamAttendance()]);
+  return { teamSize: team.length, counts: today.counts, pending: leave };
 }

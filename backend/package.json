@@ -10,7 +10,6 @@
     "start": "node server.js",
     "migrate:deploy": "prisma migrate deploy",
     "create-admin": "node scripts/createAdmin.js",
-    "reset-device": "node scripts/resetDevice.js",
     "seed": "node scripts/seed.js",
     "test": "node scripts/test.js",
     "postinstall": "prisma skills sync || exit 0"

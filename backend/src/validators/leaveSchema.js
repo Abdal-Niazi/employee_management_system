@@ -1,11 +1,11 @@
 const { z } = require("zod");
-const { isDateKey } = require("../utils/companyTime");
+const { isRealDate } = require("./attendanceSchema");
 
 const LEAVE_TYPES = ["Annual", "Sick", "Casual"];
 const MAX_LEAVE_DAYS = 60;
 
 const dateKey = (field) =>
-  z.string({ error: `${field} is required` }).refine(isDateKey, `${field} must be a date like 2026-10-09`);
+  z.string({ error: `${field} is required` }).refine(isRealDate, `${field} must be a real date as YYYY-MM-DD`);
 
 // Body of POST /api/me/leave-requests
 const createLeaveSchema = z

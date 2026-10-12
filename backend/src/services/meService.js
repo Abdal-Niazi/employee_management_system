@@ -1,16 +1,18 @@
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/AppError");
-const serializable = require("../utils/serializable");
 const managerService = require("./managerService");
-const { addDays, asDbDate, isWeekend, todayKey } = require("../utils/companyTime");
 const { MAX_LEAVE_DAYS } = require("../validators/leaveSchema");
+
+const dateFromKey = (key) => new Date(`${key}T00:00:00Z`);
 
 // Monday to Friday days from start to end, both included (the same weekend rule as attendance).
 const countWorkingDays = (startKey, endKey) => {
   let days = 0;
+  const end = dateFromKey(endKey);
 
-  for (let key = startKey; key <= endKey; key = addDays(key, 1)) {
-    if (!isWeekend(key)) days += 1;
+  for (const day = dateFromKey(startKey); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+    const weekday = day.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) days += 1;
   }
 
   return days;
@@ -29,18 +31,17 @@ const getProfile = async (employeeId) => {
 
 // ---------- Leave ----------
 
-// The person's requests, plus the company's today so the app can start the form there.
-const listLeave = async (employeeId, now = new Date()) => {
+const listLeave = async (employeeId) => {
   const rows = await prisma.leaveRequest.findMany({
     where: { employeeId },
     include: managerService.leaveInclude,
   });
 
-  return { today: todayKey(now), leaveRequests: rows.map(managerService.toLeaveDto).sort(managerService.compareLeave) };
+  return rows.map(managerService.toLeaveDto).sort(managerService.compareLeave);
 };
 
 const requestLeave = async (employeeId, { type, startDate, endDate, reason }) => {
-  const calendarDays = (asDbDate(endDate) - asDbDate(startDate)) / 86_400_000 + 1;
+  const calendarDays = (dateFromKey(endDate) - dateFromKey(startDate)) / 86_400_000 + 1;
   if (calendarDays > MAX_LEAVE_DAYS) {
     throw new AppError(`A leave request can cover at most ${MAX_LEAVE_DAYS} days`, 400);
   }
@@ -50,31 +51,25 @@ const requestLeave = async (employeeId, { type, startDate, endDate, reason }) =>
     throw new AppError("That range has no working days (only weekend days)", 400);
   }
 
-  // Checked and created in one Serializable transaction, so two requests sent at the same
-  // moment (a double tap) can't both pass the overlap check.
-  const created = await serializable(async (tx) => {
-    // Two open requests for the same day would be confusing to approve.
-    const overlapping = await tx.leaveRequest.findFirst({
-      where: {
-        employeeId,
-        status: { in: ["PENDING", "APPROVED"] },
-        startDate: { lte: asDbDate(endDate) },
-        endDate: { gte: asDbDate(startDate) },
-      },
-    });
-    if (overlapping) {
-      throw new AppError("You already have a pending or approved leave request on those days", 409);
-    }
+  // Two open requests for the same day would be confusing to approve.
+  const overlapping = await prisma.leaveRequest.findFirst({
+    where: {
+      employeeId,
+      status: { in: ["PENDING", "APPROVED"] },
+      startDate: { lte: dateFromKey(endDate) },
+      endDate: { gte: dateFromKey(startDate) },
+    },
+  });
+  if (overlapping) {
+    throw new AppError("You already have a pending or approved leave request on those days", 409);
+  }
 
-    // Without `include`: Prisma would load the relations with parallel queries on the
-    // transaction's one connection, which the pg driver warns about (and pg 9 refuses).
-    return tx.leaveRequest.create({
-      data: { employeeId, type, startDate: asDbDate(startDate), endDate: asDbDate(endDate), days, reason: reason || null },
-    });
+  const created = await prisma.leaveRequest.create({
+    data: { employeeId, type, startDate: dateFromKey(startDate), endDate: dateFromKey(endDate), days, reason: reason || null },
+    include: managerService.leaveInclude,
   });
 
-  const saved = await prisma.leaveRequest.findUnique({ where: { id: created.id }, include: managerService.leaveInclude });
-  return managerService.toLeaveDto(saved);
+  return managerService.toLeaveDto(created);
 };
 
 // Only your own request, and only while it is still pending.

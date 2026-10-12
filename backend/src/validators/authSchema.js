@@ -1,10 +1,5 @@
 const { z } = require("zod");
 
-const ROLES = ["HR_ADMIN", "MANAGER", "EMPLOYEE"];
-// Accounts that belong to an employee: a manager is the employee whose team they manage,
-// and an employee account checks that employee in and out.
-const LINKED_ROLES = ["MANAGER", "EMPLOYEE"];
-
 const email = z
   .string({ error: "email is required" })
   .trim()
@@ -28,7 +23,7 @@ const createAdminSchema = z
       .trim()
       .min(1, "name is required")
       .max(100, "name must be at most 100 characters"),
-    role: z.enum(ROLES, { error: "role must be HR_ADMIN, MANAGER or EMPLOYEE" }),
+    role: z.enum(["HR_ADMIN", "MANAGER", "EMPLOYEE"], { error: "role must be HR_ADMIN, MANAGER or EMPLOYEE" }),
     // The employee a MANAGER or EMPLOYEE account belongs to (their database id)
     employeeId: z
       .number({ error: "employeeId must be a number" })
@@ -41,13 +36,13 @@ const createAdminSchema = z
       // bcrypt ignores everything after 72 bytes, so longer passwords would be silently cut.
       .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "password must be at most 72 bytes"),
   })
-  .refine((data) => !LINKED_ROLES.includes(data.role) || data.employeeId, {
+  .refine((data) => data.role === "HR_ADMIN" || data.employeeId, {
     error: "A MANAGER or EMPLOYEE account needs the employeeId of the employee it belongs to",
     path: ["employeeId"],
   })
-  .refine((data) => LINKED_ROLES.includes(data.role) || !data.employeeId, {
+  .refine((data) => data.role !== "HR_ADMIN" || !data.employeeId, {
     error: "Only MANAGER and EMPLOYEE accounts are linked to an employee",
     path: ["employeeId"],
   });
 
-module.exports = { ROLES, LINKED_ROLES, loginSchema, createAdminSchema };
+module.exports = { loginSchema, createAdminSchema };
