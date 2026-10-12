@@ -88,8 +88,17 @@ const main = async () => {
 
   // Manager and employee accounts belong to one employee (a manager's team is the people reporting to them).
   if (input.role === "MANAGER" || input.role === "EMPLOYEE") {
-    const answer = (await ask("Employee database id this account belongs to: ")).trim();
-    input.employeeId = answer === "" ? null : Number(answer);
+    // The employee ID is the code HR sees in the app (for example EMP001), not the database id.
+    const code = (await ask("Employee ID this account belongs to (the code shown in the app, e.g. EMP001): ")).trim();
+    const employee = code ? await prisma.employee.findUnique({ where: { employeeId: code } }) : null;
+
+    if (!employee) {
+      console.error(code ? `No employee has the ID ${code}` : "An employee ID is required for this role");
+      process.exitCode = 1;
+      return;
+    }
+
+    input.employeeId = employee.id;
   }
 
   input.password = await ask("Password (min 8 characters): ", { hidden: true });
