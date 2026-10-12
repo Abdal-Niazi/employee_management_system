@@ -61,7 +61,7 @@ export default function MyLeaveScreen() {
       <FlatList
         style={styles.flex}
         contentContainerStyle={styles.content}
-        data={data.leaveRequests}
+        data={data}
         keyExtractor={(request) => String(request.id)}
         refreshing={refreshing}
         onRefresh={refresh}
@@ -95,7 +95,6 @@ export default function MyLeaveScreen() {
 
       <LeaveRequestSheet
         visible={asking}
-        today={data?.today}
         saving={saving}
         error={formError}
         onCancel={() => setAsking(false)}

@@ -5,13 +5,12 @@ import { getOverview } from "../../api/manager";
 import { useAuth } from "../../auth/AuthContext";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
-import CheckInCard from "../../components/CheckInCard";
 import { leaveSummary } from "../../components/LeaveCard";
 import { ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
 import { useAsync } from "../../hooks/useAsync";
 import { colors, font, radius, spacing } from "../../theme";
-import { formatDay } from "../../utils/date";
+import { formatDay, todayKey } from "../../utils/date";
 
 const BREAKDOWN = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "NOT_IN"];
 
@@ -39,10 +38,8 @@ export default function OverviewScreen() {
   if (status === "loading") return <LoadingState />;
   if (status === "error") return <ErrorState error={error} onRetry={reload} />;
 
-  const { date, teamSize, workday, counts, pending } = data;
-  const checkedIn = counts.PRESENT + counts.LATE;
-  // People expected at work today: not those on leave, inactive, or not hired yet.
-  const expected = checkedIn + counts.ABSENT + counts.NOT_IN;
+  const { teamSize, counts, pending } = data;
+  const isDayOff = teamSize > 0 && counts.OFF === teamSize;
 
   return (
     <ScrollView
@@ -51,32 +48,24 @@ export default function OverviewScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
     >
       <View>
-        <Text style={font.small}>{formatDay(date)}</Text>
+        <Text style={font.small}>{formatDay(todayKey())}</Text>
         <Text style={font.title}>Welcome back, {user.name || user.email.split("@")[0]}</Text>
       </View>
-
-      {/* Managers are employees too: they check themselves in here. */}
-      <CheckInCard />
 
       <View style={styles.stats}>
         <Stat icon="people-outline" label="Team members" value={teamSize} onPress={() => router.navigate("/team")} />
         <Stat
           icon="checkmark-circle-outline"
           label="Checked in today"
-          value={workday ? `${checkedIn}/${expected}` : "—"}
+          value={`${counts.PRESENT + counts.LATE}/${teamSize}`}
           onPress={() => router.navigate("/attendance")}
         />
-        <Stat
-          icon="alarm-outline"
-          label="Late today"
-          value={workday ? counts.LATE : "—"}
-          onPress={() => router.navigate("/attendance")}
-        />
+        <Stat icon="alarm-outline" label="Late today" value={counts.LATE} onPress={() => router.navigate("/attendance")} />
         <Stat icon="hourglass-outline" label="Pending leave" value={pending.length} onPress={() => router.navigate("/leave")} />
       </View>
 
       <Card title="Today's attendance">
-        {!workday ? (
+        {isDayOff ? (
           <Text style={font.small}>No shift scheduled today.</Text>
         ) : (
           <View style={styles.breakdown}>

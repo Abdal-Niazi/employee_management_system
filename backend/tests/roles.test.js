@@ -4,14 +4,12 @@ const { app, prisma, request, seedFixtures, login } = require("./helpers");
 
 let hr;
 let manager;
-let employee;
 let unlinked;
 
 before(async () => {
   await seedFixtures();
   hr = await login("hr@example.com");
   manager = await login("manager.a@example.com");
-  employee = await login("employee.a1@example.com");
   unlinked = await login("unlinked@example.com");
 });
 after(() => prisma.$disconnect());
@@ -22,32 +20,6 @@ test("every API route needs a token", async () => {
   assert.equal((await request(app).get("/api/me")).status, 401);
   assert.equal((await request(app).get("/api/attendance")).status, 401);
   assert.equal((await request(app).patch("/api/manager/leave-requests/1").send({ status: "APPROVED" })).status, 401);
-  assert.equal((await request(app).get("/api/manager/attendance")).status, 401);
-  assert.equal((await request(app).get("/api/attendance-corrections")).status, 401);
-  assert.equal((await request(app).patch("/api/attendance-corrections/1").send({ status: "APPROVED" })).status, 401);
-  assert.equal((await request(app).get("/api/me/attendance/today")).status, 401);
-  assert.equal((await request(app).post("/api/me/attendance/check-in")).status, 401);
-  assert.equal((await request(app).post("/api/me/device")).status, 401);
-  assert.equal((await request(app).delete("/api/employees/1/device")).status, 401);
-});
-
-test("employees and managers use /api/me, HR admins don't", async () => {
-  assert.equal((await request(app).get("/api/me/attendance/today").set(employee)).status, 200);
-  assert.equal((await request(app).get("/api/me/attendance/today").set(manager)).status, 200);
-
-  assert.equal((await request(app).get("/api/me/attendance/today").set(hr)).status, 403);
-  assert.equal((await request(app).post("/api/me/attendance/check-in").set(hr)).status, 403);
-
-  const res = await request(app).get("/api/me/attendance").set(unlinked);
-  assert.equal(res.status, 403);
-  assert.match(res.body.message, /isn't linked to an employee/);
-});
-
-test("an employee account can't use the manager or HR routes", async () => {
-  assert.equal((await request(app).get("/api/manager/team").set(employee)).status, 403);
-  assert.equal((await request(app).get("/api/manager/attendance").set(employee)).status, 403);
-  assert.equal((await request(app).get("/api/employees").set(employee)).status, 403);
-  assert.equal((await request(app).get("/api/attendance-corrections").set(employee)).status, 403);
 });
 
 test("only HR admins can use /api/employees", async () => {
@@ -61,16 +33,6 @@ test("only HR admins can use /api/employees", async () => {
 test("only MANAGER accounts can use /api/manager", async () => {
   assert.equal((await request(app).get("/api/manager/team").set(manager)).status, 200);
   assert.equal((await request(app).get("/api/manager/team").set(hr)).status, 403);
-  assert.equal((await request(app).get("/api/manager/attendance").set(hr)).status, 403);
-  assert.equal((await request(app).post("/api/manager/attendance-corrections").set(hr).send({})).status, 403);
-});
-
-test("only HR admins can decide attendance corrections", async () => {
-  assert.equal((await request(app).get("/api/attendance-corrections").set(hr)).status, 200);
-
-  assert.equal((await request(app).get("/api/attendance-corrections").set(manager)).status, 403);
-  const decide = await request(app).patch("/api/attendance-corrections/1").set(manager).send({ status: "APPROVED" });
-  assert.equal(decide.status, 403);
 });
 
 test("a manager account without an employee is refused", async () => {
@@ -84,15 +46,17 @@ test("only EMPLOYEE and MANAGER accounts can use /api/me", async () => {
   assert.equal((await request(app).get("/api/me").set(hr)).status, 403);
   assert.equal((await request(app).get("/api/me/leave-requests").set(hr)).status, 403);
   assert.equal((await request(app).get("/api/me").set(manager)).status, 200);
-  assert.equal((await request(app).get("/api/me").set(employee)).status, 200);
 });
 
-test("only HR admins see everyone's leave and attendance", async () => {
-  for (const who of [manager, employee]) {
-    assert.equal((await request(app).get("/api/leave-requests").set(who)).status, 403);
-    assert.equal((await request(app).patch("/api/leave-requests/1").set(who).send({ status: "APPROVED" })).status, 403);
-    assert.equal((await request(app).get("/api/attendance").set(who)).status, 403);
-  }
-  assert.equal((await request(app).get("/api/leave-requests").set(hr)).status, 200);
-  assert.equal((await request(app).get("/api/attendance").set(hr)).status, 200);
+test("employee accounts cannot use the HR or manager APIs", async () => {
+  const employee = await prisma.employee.findFirst({ where: { employeeId: "A-1" } });
+  await prisma.admin.create({
+    data: { email: "plain@example.com", name: "plain", role: "EMPLOYEE", employeeId: employee.id, passwordHash: await require("../src/services/authService").hashPassword("Correct-horse-42") },
+  });
+  const plain = await login("plain@example.com");
+
+  assert.equal((await request(app).get("/api/employees").set(plain)).status, 403);
+  assert.equal((await request(app).get("/api/manager/team").set(plain)).status, 403);
+  assert.equal((await request(app).get("/api/attendance").set(plain)).status, 403);
+  assert.equal((await request(app).get("/api/me").set(plain)).status, 200);
 });

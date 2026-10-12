@@ -1,17 +1,9 @@
-// Fills the database with sample leave requests and attendance for local development.
-// Run from backend: npm run seed. Employees who already have leave requests are skipped, and
-// attendance only fills days that have no record yet, so it is safe to run again.
+// Fills the database with sample leave requests for local development.
+// Run from backend: npm run seed. Employees who already have leave requests are skipped,
+// so it is safe to run again after adding employees.
 require("dotenv").config({ quiet: true });
 
-// Sample data is only for development: never fill a real company's database with it.
-if (process.env.NODE_ENV === "production") {
-  console.error("Refusing to seed: NODE_ENV is production. npm run seed only adds sample data for development.");
-  process.exit(1);
-}
-
 const prisma = require("../src/utils/prisma");
-const companyTime = require("../src/utils/companyTime");
-const { SHIFT } = require("../src/utils/attendanceRules");
 
 const LEAVE_TYPES = ["Annual", "Sick", "Casual"];
 const REASONS = {
@@ -36,10 +28,19 @@ function hash(text) {
   return h >>> 0;
 }
 
-// Days are "YYYY-MM-DD" keys in the company's timezone, the same as the API uses, so the sample
-// data lines up with the app whatever timezone this computer is set to.
-const { addDays, asDbDate: asDate, fromCompanyTime, isWeekend, toDateKey, todayKey } = companyTime;
+// Days are handled as local "YYYY-MM-DD" keys.
 const pad = (n) => String(n).padStart(2, "0");
+const toKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const fromKey = (key) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (key, days) => {
+  const date = fromKey(key);
+  date.setDate(date.getDate() + days);
+  return toKey(date);
+};
+const isWeekend = (key) => [0, 6].includes(fromKey(key).getDay());
 const nextWeekday = (key) => {
   let day = key;
   while (isWeekend(day)) day = addDays(day, 1);
@@ -51,12 +52,14 @@ const endAfterWorkingDays = (start, days) => {
   for (let left = days - 1; left > 0; left--) end = nextWeekday(addDays(end, 1));
   return end;
 };
+// DATE columns hold the calendar day as UTC midnight.
+const asDate = (key) => new Date(`${key}T00:00:00.000Z`);
 
 function makeRequest(employee, n, { startOffset, days, status, requestedOffset }) {
   const h = hash(`${employee.employeeId}#${n}`);
   const type = LEAVE_TYPES[h % LEAVE_TYPES.length];
-  const today = todayKey();
-  const hired = toDateKey(employee.hireDate);
+  const today = toKey(new Date());
+  const hired = employee.hireDate.toISOString().slice(0, 10);
   const startDate = nextWeekday(addDays(today, startOffset));
   const requested = addDays(today, requestedOffset);
   const requestedKey = requested < hired ? hired : requested;
@@ -69,9 +72,8 @@ function makeRequest(employee, n, { startOffset, days, status, requestedOffset }
     days,
     reason: REASONS[type][h % REASONS[type].length],
     status,
-    // Asked mid-morning, decided the next morning (company time)
-    createdAt: fromCompanyTime(requestedKey, "10:00"),
-    decidedAt: status === "PENDING" ? null : fromCompanyTime(addDays(requestedKey, 1), "11:00"),
+    createdAt: fromKey(requestedKey),
+    decidedAt: status === "PENDING" ? null : fromKey(addDays(requestedKey, 1)),
     decidedById: status === "PENDING" ? null : employee.managerId,
     decisionNote: status === "REJECTED" ? "Overlaps with a release week" : null,
   };
@@ -79,8 +81,8 @@ function makeRequest(employee, n, { startOffset, days, status, requestedOffset }
 
 function sampleLeave(employee) {
   const h = hash(employee.employeeId);
-  const today = todayKey();
-  const hired = toDateKey(employee.hireDate);
+  const today = toKey(new Date());
+  const hired = employee.hireDate.toISOString().slice(0, 10);
 
   // An upcoming request waiting for the manager.
   const rows = [
@@ -113,69 +115,6 @@ function sampleLeave(employee) {
   return rows;
 }
 
-// ---------- Attendance ----------
-
-// Six weeks, about 30 working days.
-const HISTORY_DAYS = 42;
-
-const toTime = (minutes) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
-
-// One day's check-in, or null for an absence. About 8% of days are absences and 20% are late;
-// everyone else arrives up to 25 minutes early. Today only gets what has already happened.
-function sampleDay(employee, dateKey, today, nowMinutes) {
-  const roll = hash(`${employee.employeeId}|${dateKey}`) % 100;
-  if (roll < 8) return null;
-
-  const start = companyTime.toMinutes(SHIFT.start);
-  const checkIn = roll < 28 ? start + SHIFT.graceMinutes + 1 + (roll % 35) : start - 25 + (roll % 24);
-  const checkOut = companyTime.toMinutes(SHIFT.end) + (roll % 50);
-  const isToday = dateKey === today;
-
-  if (isToday && checkIn > nowMinutes) return null;
-
-  return {
-    employeeId: employee.id,
-    date: companyTime.asDbDate(dateKey),
-    checkIn: companyTime.fromCompanyTime(dateKey, toTime(checkIn)),
-    checkOut: isToday && checkOut > nowMinutes ? null : companyTime.fromCompanyTime(dateKey, toTime(checkOut)),
-  };
-}
-
-const seedAttendance = async () => {
-  const today = companyTime.todayKey();
-  const nowMinutes = companyTime.nowMinutes();
-  const days = Array.from({ length: HISTORY_DAYS }, (_, i) => companyTime.addDays(today, -i)).filter(
-    (day) => !companyTime.isWeekend(day)
-  );
-
-  const employees = await prisma.employee.findMany({
-    include: { leaveRequests: { where: { status: "APPROVED" } }, account: { select: { id: true } } },
-    orderBy: { id: "asc" },
-  });
-
-  let created = 0;
-  for (const employee of employees) {
-    const hired = companyTime.toDateKey(employee.hireDate);
-    const onLeave = (day) =>
-      employee.leaveRequests.some(
-        (r) => companyTime.toDateKey(r.startDate) <= day && day <= companyTime.toDateKey(r.endDate)
-      );
-    // People who can sign in check themselves in today; a sample check-in would block their button.
-    const checksInThemselves = (day) => employee.account && day === today;
-
-    const data = days
-      .filter((day) => day >= hired && !onLeave(day) && !checksInThemselves(day))
-      .map((day) => sampleDay(employee, day, today, nowMinutes))
-      .filter(Boolean);
-
-    // skipDuplicates leaves days that already have a record (and HR corrections) alone.
-    const { count } = await prisma.attendance.createMany({ data, skipDuplicates: true });
-    created += count;
-  }
-
-  console.log(`Attendance: created ${created} record(s) for the last ${HISTORY_DAYS} days.`);
-};
-
 const main = async () => {
   const total = await prisma.employee.count();
   const employees = await prisma.employee.findMany({
@@ -193,9 +132,6 @@ const main = async () => {
     `Leave requests: created ${created} for ${employees.length} employee(s); ` +
       `skipped ${total - employees.length} who already had some.`
   );
-
-  // After leave, so days on approved leave get no check-in.
-  await seedAttendance();
 };
 
 main()

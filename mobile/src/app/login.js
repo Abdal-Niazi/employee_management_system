@@ -19,8 +19,6 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSignIn = async () => {
-    // Enter on the keyboard can fire again while a sign-in is already on its way.
-    if (submitting) return;
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       setError("Enter a valid email address.");
       return;
@@ -127,8 +125,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.xl,
-    // One style for iOS, Android and web (the shadow* props are deprecated)
-    boxShadow: "0px 6px 16px rgba(28, 34, 48, 0.08)",
+    shadowColor: colors.text,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   label: { fontSize: 14, fontWeight: "600", color: colors.text, marginTop: spacing.md, marginBottom: spacing.sm },
   input: {
