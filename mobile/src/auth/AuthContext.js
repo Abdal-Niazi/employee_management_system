@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getCurrentAdmin, loginRequest } from "../api/auth";
-import { setAuthToken, setUnauthorizedHandler } from "../api/client";
+import { ApiError, setAuthToken, setUnauthorizedHandler } from "../api/client";
 import { clearToken, loadToken, saveToken } from "./tokenStorage";
 
 const AuthContext = createContext(null);
@@ -12,16 +12,22 @@ const toUser = (admin) => ({ ...admin, role: SERVER_ROLES[admin.role] });
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [restoring, setRestoring] = useState(true);
+  // The saved session couldn't be checked because the server didn't answer properly.
+  const [unreachable, setUnreachable] = useState(false);
 
   const logout = useCallback(async () => {
     setAuthToken(null);
     setUser(null);
+    setUnreachable(false);
     await clearToken().catch(() => {});
   }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(logout);
   }, [logout]);
+
+  // Bumped by Retry to check the saved session again.
+  const [attempt, setAttempt] = useState(0);
 
   // Pick the saved session back up on app start; the server decides if it is still valid.
   useEffect(() => {
@@ -34,9 +40,13 @@ export function AuthProvider({ children }) {
         setAuthToken(token);
         const admin = await getCurrentAdmin();
         if (!cancelled) setUser(toUser(admin));
-      } catch {
-        // Expired token (401) is cleared by the client; an unreachable API just shows the login screen.
-        setAuthToken(null);
+      } catch (error) {
+        if (cancelled) return;
+        // No connection, or the server is having trouble: keep the saved session and offer a
+        // retry instead of asking for the password again. A 401 (expired token) was already
+        // signed out by the client.
+        if (error instanceof ApiError && error.status !== 401) setUnreachable(true);
+        else setAuthToken(null);
       } finally {
         if (!cancelled) setRestoring(false);
       }
@@ -45,6 +55,12 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
+  }, [attempt]);
+
+  const retry = useCallback(() => {
+    setUnreachable(false);
+    setRestoring(true);
+    setAttempt((n) => n + 1);
   }, []);
 
   const login = async (email, password) => {
@@ -54,7 +70,9 @@ export function AuthProvider({ children }) {
     setUser(toUser(admin));
   };
 
-  return <AuthContext.Provider value={{ user, restoring, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, restoring, unreachable, retry, login, logout }}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

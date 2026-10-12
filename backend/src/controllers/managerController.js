@@ -1,9 +1,12 @@
-const attendanceService = require("../services/attendanceService");
 const managerService = require("../services/managerService");
+const attendanceService = require("../services/attendanceService");
 const AppError = require("../utils/AppError");
-const { parseDateParam, parseDays } = require("../utils/attendanceQuery");
 const parseId = require("../utils/parseId");
+const parseDateKey = require("../utils/parseDateKey");
+const parseDays = require("../utils/parseDays");
+const { todayKey } = require("../utils/companyTime");
 const { LEAVE_STATUSES } = require("../validators/managerSchema");
+const { CORRECTION_STATUSES } = require("../validators/attendanceSchema");
 
 // The manager is always the signed-in MANAGER account's own employee, never a
 // value from the request, so nobody can open another manager's team.
@@ -86,12 +89,12 @@ const decideLeave = async (req, res) => {
   });
 };
 
-// The team's attendance for one day (default today).
+// ---------- Attendance ----------
+
 const getAttendance = async (req, res) => {
   const manager = await resolveManager(req);
-  const now = new Date();
-  const date = parseDateParam(req.query.date, attendanceService.localDateKey(now));
-  const day = await attendanceService.getTeamDay(manager.id, date, now);
+  const date = req.query.date === undefined ? todayKey() : parseDateKey(req.query.date);
+  const day = await attendanceService.getTeamDay(manager.id, date);
 
   res.status(200).json({
     message: "Attendance retrieved successfully",
@@ -99,19 +102,47 @@ const getAttendance = async (req, res) => {
   });
 };
 
-// One team member's last few days, newest first.
 const getMemberAttendance = async (req, res) => {
   const manager = await resolveManager(req);
-  const days = parseDays(req.query.days);
-  const attendance = await attendanceService.getMemberDays(manager.id, parseId(req.params.id, "Employee id"), days);
+  const history = await attendanceService.getMemberHistory(
+    manager.id,
+    parseId(req.params.id, "Employee id"),
+    parseDays(req.query.days)
+  );
 
-  if (!attendance) {
+  if (!history) {
     throw new AppError("Team member not found", 404);
   }
 
   res.status(200).json({
     message: "Attendance retrieved successfully",
-    attendance,
+    ...history,
+  });
+};
+
+const getCorrections = async (req, res) => {
+  const manager = await resolveManager(req);
+  const { status } = req.query;
+
+  if (status !== undefined && !CORRECTION_STATUSES.includes(status)) {
+    throw new AppError(`status must be one of: ${CORRECTION_STATUSES.join(", ")}`, 400);
+  }
+
+  const corrections = await attendanceService.listTeamCorrections(manager.id, status);
+
+  res.status(200).json({
+    message: "Corrections retrieved successfully",
+    corrections,
+  });
+};
+
+const requestCorrection = async (req, res) => {
+  const manager = await resolveManager(req);
+  const correction = await attendanceService.requestCorrection(manager.id, req.body);
+
+  res.status(201).json({
+    message: "Correction sent to HR",
+    correction,
   });
 };
 
@@ -123,4 +154,6 @@ module.exports = {
   decideLeave,
   getAttendance,
   getMemberAttendance,
+  getCorrections,
+  requestCorrection,
 };

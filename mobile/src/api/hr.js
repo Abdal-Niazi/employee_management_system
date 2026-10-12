@@ -51,22 +51,46 @@ export async function decideLeaveAsHr(id, decision, note) {
   return leaveRequest;
 }
 
-// Attendance (HR admins record it; managers read their team's through /api/manager).
+// Attendance: HR admins write and fix anyone's day directly (every change is kept in the history)
+// and decide the corrections managers ask for. Managers read their team's through /api/manager.
 
-// Everyone's record for one day: { date, shift, rows: [{ employee, record }], counts }
+// Everyone's record for one day (no date = the company's today, from the server):
+// { date, today, workday, shift, rows: [{ employee, record }], counts }
 export function getAttendanceDay(dateKey) {
-  return request(`/api/attendance?date=${encodeURIComponent(dateKey)}`);
+  const query = dateKey ? `?date=${encodeURIComponent(dateKey)}` : "";
+  return request(`/api/attendance${query}`);
 }
 
-// Saves (or corrects) one employee's check-in and check-out for a day.
-export async function saveAttendance({ employeeId, date, checkIn, checkOut }) {
+// Saves (or fixes) one person's check-in and check-out ("HH:MM") for a day. No check-out means none.
+export async function saveAttendance({ employeeId, date, checkIn, checkOut, note }) {
   const { record } = await request("/api/attendance", {
     method: "PUT",
-    body: JSON.stringify({ employeeId, date, checkIn, checkOut: checkOut || null }),
+    body: JSON.stringify({ employeeId, date, checkIn, checkOut: checkOut || null, note: note?.trim() || null }),
   });
   return record;
 }
 
-export async function removeAttendance(employeeId, date) {
-  await request(`/api/attendance/${employeeId}/${date}`, { method: "DELETE" });
+// Removes a check-in made by mistake. The day then counts as absent again.
+export async function removeAttendance(employeeId, date, note) {
+  const { record } = await request(`/api/attendance/${encodeURIComponent(employeeId)}/${encodeURIComponent(date)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ note: note?.trim() || null }),
+  });
+  return record;
+}
+
+// Managers' correction requests (status PENDING, APPROVED or REJECTED; none = all, waiting first)
+export async function getCorrectionRequests(status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const { corrections } = await request(`/api/attendance-corrections${query}`);
+  return corrections;
+}
+
+// Approving changes the attendance record; rejecting leaves it as it was.
+export async function decideCorrection(id, decision, note) {
+  const { correction } = await request(`/api/attendance-corrections/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: decision, note: note?.trim() || null }),
+  });
+  return correction;
 }

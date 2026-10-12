@@ -1,6 +1,6 @@
 const { after, before, describe, test } = require("node:test");
 const assert = require("node:assert/strict");
-const { app, prisma, request, seedFixtures, login, account } = require("./helpers");
+const { app, prisma, request, seedFixtures, login } = require("./helpers");
 
 let data;
 let hr;
@@ -17,10 +17,9 @@ before(async () => {
   lonerLeave = await prisma.leaveRequest.create({
     data: { employeeId: loner.id, type: "Casual", startDate: new Date("2026-12-07"), endDate: new Date("2026-12-07"), days: 1, reason: "Errand" },
   });
-  await account("amir@example.com", "EMPLOYEE", data.a1.id);
   hr = await login("hr@example.com");
   managerA = await login("manager.a@example.com");
-  amir = await login("amir@example.com");
+  amir = await login("employee.a1@example.com");
 });
 after(() => prisma.$disconnect());
 

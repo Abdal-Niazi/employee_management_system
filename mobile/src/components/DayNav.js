@@ -1,13 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, font, radius, spacing } from "../theme";
-import { addDays, formatDay, relativeDayLabel, todayKey } from "../utils/date";
+import { addDays, formatDay, relativeDayLabel } from "../utils/date";
 
-// Previous / next day bar for the attendance screens. You can't go past today.
-export default function DayNav({ date, shift, onChange }) {
-  const isToday = date === todayKey();
-  const label = relativeDayLabel(date);
-  const subtitle = label === formatDay(date) ? "" : `${formatDay(date)} · `;
+// Previous / next day bar for the attendance screens. `today` is the company's day, sent by the
+// server, so a phone in another timezone still shows the right day and can't go past today.
+export default function DayNav({ date, today, shift, onChange }) {
+  const isToday = !today || date === today;
+  const label = relativeDayLabel(date, today);
+  const subtitle = label === formatDay(date) ? "" : formatDay(date);
+  const details = [subtitle, shift && `Shift ${shift.start}–${shift.end}`].filter(Boolean).join(" · ");
 
   return (
     <View style={styles.dateNav}>
@@ -20,10 +22,7 @@ export default function DayNav({ date, shift, onChange }) {
       </Pressable>
       <View style={styles.dateLabel}>
         <Text style={font.heading}>{label}</Text>
-        <Text style={font.small}>
-          {subtitle}
-          {shift ? `Shift ${shift.start}–${shift.end}` : ""}
-        </Text>
+        {details ? <Text style={font.small}>{details}</Text> : null}
       </View>
       <Pressable
         accessibilityLabel="Next day"
