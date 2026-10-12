@@ -1,1 +1,57 @@
-# employee_management_system
+# Employee Management System
+
+A mobile app and API for a small company: HR keeps the employee records and attendance, managers
+approve their team's leave, and employees check in and out and ask for leave from their phone.
+
+| Folder | What it is |
+|---|---|
+| [`backend/`](backend/README.md) | Express 5 + Prisma 7 + PostgreSQL API |
+| [`mobile/`](mobile/README.md) | Expo (React Native) app for HR admins, managers and employees |
+
+## Who uses it
+
+| Role | What they do in the app |
+|---|---|
+| **HR admin** | Adds, edits and deletes employees, writes or corrects attendance, and sees and decides everyone's leave (this is how leave gets decided for people with no manager) |
+| **Manager** | Sees their own team, the team's attendance for a day, and approves or rejects the team's leave |
+| **Employee** | Checks in and out, sees their profile and manager, their attendance, and asks for or cancels leave |
+
+Manager and employee accounts each belong to one employee. Everyone signs in with an email and a
+password, and the server decides which screens they get from their role.
+
+## Get it running
+
+You need Node.js 20.19 or newer and PostgreSQL.
+
+1. **Backend** (see [`backend/README.md`](backend/README.md) for the details):
+
+   ```bash
+   cd backend
+   npm install
+   cp .env.example .env            # fill in DATABASE_URL and JWT_SECRET
+   npm run migrate:deploy          # create the tables
+   npm run create-admin            # the first account: choose HR_ADMIN
+   npm start                       # http://localhost:5000
+   ```
+
+2. **Mobile app** (see [`mobile/README.md`](mobile/README.md)):
+
+   ```bash
+   cd mobile
+   npm install
+   cp .env.example .env            # on a phone, set EXPO_PUBLIC_API_URL to your computer's LAN address
+   npx expo start --clear          # scan the QR code with Expo Go, or press w for the browser
+   ```
+
+3. Sign in as the HR admin, add some employees, then create manager and employee accounts with
+   `npm run create-admin` (it asks for the employee's ID, the code shown in the app such as
+   `EMP001`) and give employees a manager by editing them in the app.
+
+## Day to day
+
+- **Tests:** `npm test` in `backend/` (uses its own `_test` database, never your real one) and
+  `npx expo lint` in `mobile/`.
+- **Branches:** one branch per piece of work, opened as a pull request into `main`.
+- **Rules built in:** a day without a check-in counts as absent only after the shift ends;
+  check-in after 09:05 is late; leave counts Monday to Friday and can't overlap another request.
+  The shift (09:00 to 17:00) lives in `backend/src/services/attendanceService.js`.

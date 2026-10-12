@@ -1,13 +1,13 @@
-# EMS mobile app — Manager screens
+# EMS mobile app
 
-Expo (React Native) app for the Employee Management System, built on `feature/manager`.
-It talks to the Express API in `../backend`; it never connects to PostgreSQL directly.
+Expo (React Native) app for the Employee Management System, with screens for HR admins, managers
+and employees. It talks to the Express API in `../backend`; it never connects to PostgreSQL directly.
 
 ## Run it
 
 Start PostgreSQL and the backend first (see `../backend/README.md`): `npm install`,
-`npm run migrate:deploy`, a manager account (below), optionally `npm run seed` for sample leave
-requests, then `npm start` (port 5000). Then, here:
+`npm run migrate:deploy`, an HR admin account (`npm run create-admin`), optionally `npm run seed` for
+sample leave requests, then `npm start` (port 5000). Then, here:
 
 ```bash
 npm install
@@ -30,8 +30,8 @@ The phone and computer must be on the same Wi-Fi, and Windows Firewall must allo
 
 Each manager and each employee signs in with their own account, which belongs to one employee. In
 `../backend` run `npm run create-admin`, choose role `MANAGER` or `EMPLOYEE`, and give that employee's
-database `id` (not their employee code). The manager then sees the employees whose `managerId` is that id; HR sets it with
-`PATCH /api/employees/:id` and `{ "managerId": 4 }` (`null` removes it).
+ID (the code shown in the app, such as `EMP001`). A manager then sees the employees whose manager is
+that employee; HR sets that by editing an employee in the app and choosing the manager.
 
 ### Release builds
 
