@@ -12,6 +12,13 @@ export function leaveSummary(request) {
   return `${formatRange(request.startDate, request.endDate)} · ${days}`;
 }
 
+// What the person has left of this kind of leave in the year it starts in. The request's own days are
+// already held back, so this is what is left if it is approved.
+function balanceNote({ type, year, entitlement, remaining }) {
+  if (remaining === 0) return `No ${type} days left in ${year} after this request (of ${entitlement})`;
+  return `${type} balance ${year}: ${remaining} of ${entitlement} days left after this request`;
+}
+
 export default function LeaveCard({ request, onApprove, onReject, onCancel, showName = true, showManager = false }) {
   const pending = request.status === "PENDING";
 
@@ -32,6 +39,12 @@ export default function LeaveCard({ request, onApprove, onReject, onCancel, show
         <Text style={font.body}>{leaveSummary(request)}</Text>
       </View>
       {request.reason ? <Text style={[font.body, styles.reason]}>“{request.reason}”</Text> : <View style={styles.noReason} />}
+
+      {pending && request.balance && (
+        <Text style={[font.small, request.balance.remaining === 0 && styles.warning]}>
+          {balanceNote(request.balance)}
+        </Text>
+      )}
 
       {showManager && (
         <Text style={[font.small, !request.managerName && styles.noManager]}>
@@ -75,6 +88,7 @@ const styles = StyleSheet.create({
   reason: { color: colors.muted, fontStyle: "italic", marginVertical: spacing.sm },
   noReason: { height: spacing.sm },
   noManager: { color: colors.warning, fontWeight: "600" },
+  warning: { color: colors.warning, fontWeight: "600" },
   note: { marginTop: spacing.xs, color: colors.text },
   actions: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },
   action: { flex: 1 },

@@ -46,7 +46,9 @@ towards the year its first day falls in, only Monday to Friday days are counted,
 with a 409 if it needs more days than are left of that kind. Approved days are used up and days
 waiting for a decision are held back, so asking twice can't get past the limit; rejected and
 cancelled requests give their days back. `GET /api/me/leave-balance?year=` shows the numbers.
-Nothing carries over to the next year.
+Nothing carries over to the next year. The leave lists managers and HR admins decide from carry a
+`balance` on every pending request (what is left of that kind in the year it starts in, with the
+request's own days already held back), and `balance: null` on decided ones.
 
 ## Tests
 

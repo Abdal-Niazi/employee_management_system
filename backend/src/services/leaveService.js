@@ -11,7 +11,7 @@ const listAll = async (status) => {
     include: managerService.leaveInclude,
   });
 
-  return rows.map(managerService.toLeaveDto).sort(managerService.compareLeave);
+  return (await managerService.withBalances(rows)).sort(managerService.compareLeave);
 };
 
 // An HR admin approves or rejects any pending request, whoever the employee's manager is.
