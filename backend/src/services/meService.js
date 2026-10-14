@@ -1,7 +1,7 @@
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/AppError");
+const leaveBalance = require("./leaveBalanceService");
 const managerService = require("./managerService");
-const { ENTITLEMENTS } = require("../utils/leavePolicy");
 const { MAX_LEAVE_DAYS } = require("../validators/leaveSchema");
 
 const dateFromKey = (key) => new Date(`${key}T00:00:00Z`);
@@ -32,27 +32,7 @@ const getProfile = async (employeeId) => {
 
 // ---------- Leave ----------
 
-// A request counts towards the calendar year it starts in.
-const yearRange = (year) => ({ gte: dateFromKey(`${year}-01-01`), lte: dateFromKey(`${year}-12-31`) });
-
-// Days taken (approved) and days waiting for a decision (pending) per kind of leave in `year`,
-// next to what the person is entitled to. Rejected and cancelled requests don't count.
-const getBalance = async (employeeId, year) => {
-  const rows = await prisma.leaveRequest.findMany({
-    where: { employeeId, status: { in: ["PENDING", "APPROVED"] }, startDate: yearRange(year) },
-    select: { type: true, status: true, days: true },
-  });
-
-  const balances = Object.entries(ENTITLEMENTS).map(([type, entitlement]) => {
-    const sum = (status) => rows.filter((r) => r.type === type && r.status === status).reduce((n, r) => n + r.days, 0);
-    const used = sum("APPROVED");
-    const pending = sum("PENDING");
-
-    return { type, entitlement, used, pending, remaining: Math.max(entitlement - used - pending, 0) };
-  });
-
-  return { year, balances };
-};
+const { getBalance } = leaveBalance;
 
 const listLeave = async (employeeId) => {
   const rows = await prisma.leaveRequest.findMany({

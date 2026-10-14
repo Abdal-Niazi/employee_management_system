@@ -1,5 +1,6 @@
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/AppError");
+const leaveBalance = require("./leaveBalanceService");
 
 const getManager = async (managerId) => {
   const manager = await prisma.employee.findUnique({
@@ -76,6 +77,8 @@ const toLeaveDto = (row) => ({
   decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
   decisionNote: row.decisionNote,
   decidedBy: deciderName(row),
+  // Filled in for pending requests when someone is about to decide them (see withBalances)
+  balance: null,
 });
 
 // Pending first (soonest leave first), then decided (most recent decision first).
@@ -87,6 +90,13 @@ const compareLeave = (a, b) => {
   return (b.decidedAt ?? "").localeCompare(a.decidedAt ?? "");
 };
 
+// The requests as the app shows them, each pending one with the balance it would draw on.
+const withBalances = async (rows) => {
+  const balances = await leaveBalance.forPending(rows);
+
+  return rows.map((row) => ({ ...toLeaveDto(row), balance: balances.get(row.id) ?? null }));
+};
+
 // The team's leave requests, optionally only one status.
 const listLeave = async (managerId, status) => {
   const rows = await prisma.leaveRequest.findMany({
@@ -94,7 +104,7 @@ const listLeave = async (managerId, status) => {
     include: leaveInclude,
   });
 
-  return rows.map(toLeaveDto).sort(compareLeave);
+  return (await withBalances(rows)).sort(compareLeave);
 };
 
 // One team member's leave history, or null if they aren't in the team.
@@ -107,7 +117,7 @@ const listMemberLeave = async (managerId, employeeId) => {
     include: leaveInclude,
   });
 
-  return rows.map(toLeaveDto).sort(compareLeave);
+  return (await withBalances(rows)).sort(compareLeave);
 };
 
 const decideLeave = async (managerId, id, { status, note }) => {
@@ -137,6 +147,7 @@ const decideLeave = async (managerId, id, { status, note }) => {
 module.exports = {
   leaveInclude,
   toLeaveDto,
+  withBalances,
   compareLeave,
   getManager,
   getTeam,
