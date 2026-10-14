@@ -53,7 +53,7 @@ Every manager screen reads real data from `/api/manager`, through `src/api/manag
 | Screen | Endpoints |
 |---|---|
 | My Team, member details | `GET /api/manager/team`, `GET /api/manager/team/:id` (employees whose `managerId` is the manager) |
-| Leave approvals, leave history | `GET /api/manager/leave-requests?status=`, `GET /api/manager/team/:id/leave-requests`, `PATCH /api/manager/leave-requests/:id` |
+| Leave approvals, leave history (each pending request shows what the employee has left) | `GET /api/manager/leave-requests?status=`, `GET /api/manager/team/:id/leave-requests`, `PATCH /api/manager/leave-requests/:id` |
 | Attendance (team, member last 7 days) | `GET /api/manager/attendance?date=YYYY-MM-DD`, `GET /api/manager/team/:id/attendance?days=7` |
 | Overview | team, pending leave and today's attendance counts from the endpoints above |
 
