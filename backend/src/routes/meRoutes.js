@@ -18,6 +18,8 @@ router.post("/check-in", meController.checkIn);
 
 router.post("/check-out", meController.checkOut);
 
+router.get("/leave-balance", meController.getLeaveBalance);
+
 router.get("/leave-requests", meController.getLeaveRequests);
 
 router.post("/leave-requests", validate(createLeaveSchema), meController.requestLeave);

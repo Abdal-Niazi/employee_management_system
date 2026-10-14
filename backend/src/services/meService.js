@@ -1,6 +1,7 @@
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/AppError");
 const managerService = require("./managerService");
+const { ENTITLEMENTS } = require("../utils/leavePolicy");
 const { MAX_LEAVE_DAYS } = require("../validators/leaveSchema");
 
 const dateFromKey = (key) => new Date(`${key}T00:00:00Z`);
@@ -31,6 +32,28 @@ const getProfile = async (employeeId) => {
 
 // ---------- Leave ----------
 
+// A request counts towards the calendar year it starts in.
+const yearRange = (year) => ({ gte: dateFromKey(`${year}-01-01`), lte: dateFromKey(`${year}-12-31`) });
+
+// Days taken (approved) and days waiting for a decision (pending) per kind of leave in `year`,
+// next to what the person is entitled to. Rejected and cancelled requests don't count.
+const getBalance = async (employeeId, year) => {
+  const rows = await prisma.leaveRequest.findMany({
+    where: { employeeId, status: { in: ["PENDING", "APPROVED"] }, startDate: yearRange(year) },
+    select: { type: true, status: true, days: true },
+  });
+
+  const balances = Object.entries(ENTITLEMENTS).map(([type, entitlement]) => {
+    const sum = (status) => rows.filter((r) => r.type === type && r.status === status).reduce((n, r) => n + r.days, 0);
+    const used = sum("APPROVED");
+    const pending = sum("PENDING");
+
+    return { type, entitlement, used, pending, remaining: Math.max(entitlement - used - pending, 0) };
+  });
+
+  return { year, balances };
+};
+
 const listLeave = async (employeeId) => {
   const rows = await prisma.leaveRequest.findMany({
     where: { employeeId },
@@ -49,6 +72,18 @@ const requestLeave = async (employeeId, { type, startDate, endDate, reason }) =>
   const days = countWorkingDays(startDate, endDate);
   if (days === 0) {
     throw new AppError("That range has no working days (only weekend days)", 400);
+  }
+
+  // Only as many days as are left this year (waiting requests are held back, so asking twice
+  // can't get past the limit; cancelling one gives its days back).
+  const year = Number(startDate.slice(0, 4));
+  const { balances } = await getBalance(employeeId, year);
+  const balance = balances.find((b) => b.type === type);
+  if (days > balance.remaining) {
+    throw new AppError(
+      `You only have ${balance.remaining} ${type} leave day${balance.remaining === 1 ? "" : "s"} left for ${year}, and this request is for ${days}`,
+      409
+    );
   }
 
   // Two open requests for the same day would be confusing to approve.
@@ -81,4 +116,4 @@ const cancelLeave = async (employeeId, id) => {
   if (count === 0) throw new AppError("This request has already been decided and can't be cancelled", 409);
 };
 
-module.exports = { countWorkingDays, getProfile, listLeave, requestLeave, cancelLeave };
+module.exports = { countWorkingDays, getProfile, getBalance, listLeave, requestLeave, cancelLeave };
