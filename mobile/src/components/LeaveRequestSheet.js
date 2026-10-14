@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleShee
 import { colors, font, radius, spacing } from "../theme";
 import { todayKey } from "../utils/date";
 import Button from "./Button";
+import { balanceHint } from "./LeaveBalance";
 import SegmentedControl from "./SegmentedControl";
 
 const TYPES = [
@@ -18,19 +19,19 @@ function isRealDate(text) {
 }
 
 // Pop-up form to ask for leave. A custom modal because Alert.prompt only exists on iOS.
-export default function LeaveRequestSheet({ visible, saving, error, onCancel, onSubmit }) {
+export default function LeaveRequestSheet({ visible, balance, saving, error, onCancel, onSubmit }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={saving ? undefined : onCancel} />
         {/* Mounted only while open, so the form starts fresh every time. */}
-        {visible && <Form saving={saving} error={error} onCancel={onCancel} onSubmit={onSubmit} />}
+        {visible && <Form balance={balance} saving={saving} error={error} onCancel={onCancel} onSubmit={onSubmit} />}
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-function Form({ saving, error, onCancel, onSubmit }) {
+function Form({ balance, saving, error, onCancel, onSubmit }) {
   const [type, setType] = useState("Annual");
   const [startDate, setStartDate] = useState(todayKey());
   const [endDate, setEndDate] = useState(todayKey());
@@ -58,6 +59,9 @@ function Form({ saving, error, onCancel, onSubmit }) {
 
         <Text style={styles.label}>Type</Text>
         <SegmentedControl options={TYPES} value={type} onChange={setType} />
+        {balance ? (
+          <Text style={styles.hint}>{balanceHint(balance.balances.find((b) => b.type === type), balance.year)}</Text>
+        ) : null}
 
         <Text style={styles.label}>First day</Text>
         <TextInput
@@ -140,6 +144,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   reason: { minHeight: 76, paddingTop: spacing.md, textAlignVertical: "top" },
+  hint: { fontSize: 13, color: colors.muted, marginTop: spacing.xs },
   error: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   actions: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },
   action: { flex: 1 },

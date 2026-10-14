@@ -31,6 +31,14 @@ export async function getMyLeave() {
   return leaveRequests;
 }
 
+// GET /api/me/leave-balance?year= -> { year, balances: [{ type, entitlement, used, pending, remaining }] }
+// (no year = this year). Days waiting for a decision are already taken out of `remaining`.
+export async function getMyLeaveBalance(year) {
+  const query = year ? `?year=${encodeURIComponent(year)}` : "";
+  const { year: shown, balances } = await request(`/api/me/leave-balance${query}`);
+  return { year: shown, balances };
+}
+
 // { type: "Annual" | "Sick" | "Casual", startDate, endDate, reason }
 export async function requestLeave(data) {
   const { leaveRequest } = await request("/api/me/leave-requests", { method: "POST", body: JSON.stringify(data) });

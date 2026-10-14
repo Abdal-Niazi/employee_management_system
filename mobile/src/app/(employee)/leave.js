@@ -1,16 +1,23 @@
 import { useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
-import { cancelLeave, getMyLeave, requestLeave } from "../../api/me";
+import { cancelLeave, getMyLeave, getMyLeaveBalance, requestLeave } from "../../api/me";
 import Button from "../../components/Button";
 import ConfirmModal from "../../components/ConfirmModal";
+import LeaveBalance from "../../components/LeaveBalance";
 import LeaveCard from "../../components/LeaveCard";
 import LeaveRequestSheet from "../../components/LeaveRequestSheet";
 import { EmptyState, ErrorState, LoadingState } from "../../components/States";
 import { useAsync } from "../../hooks/useAsync";
 import { colors, spacing } from "../../theme";
 
+// The requests and this year's balance, which change together.
+async function loadLeave() {
+  const [requests, balance] = await Promise.all([getMyLeave(), getMyLeaveBalance()]);
+  return { requests, balance };
+}
+
 export default function MyLeaveScreen() {
-  const { status, data, error, reload, refresh, revalidate, refreshing } = useAsync(getMyLeave);
+  const { status, data, error, reload, refresh, revalidate, refreshing } = useAsync(loadLeave);
 
   const [asking, setAsking] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,10 +68,15 @@ export default function MyLeaveScreen() {
       <FlatList
         style={styles.flex}
         contentContainerStyle={styles.content}
-        data={data}
+        data={data.requests}
         keyExtractor={(request) => String(request.id)}
         refreshing={refreshing}
         onRefresh={refresh}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <LeaveBalance year={data.balance.year} balances={data.balance.balances} />
+          </View>
+        }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
           <EmptyState
@@ -95,6 +107,7 @@ export default function MyLeaveScreen() {
 
       <LeaveRequestSheet
         visible={asking}
+        balance={status === "success" ? data.balance : null}
         saving={saving}
         error={formError}
         onCancel={() => setAsking(false)}
@@ -126,4 +139,5 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   content: { padding: spacing.lg, flexGrow: 1 },
+  header: { marginBottom: spacing.lg },
 });

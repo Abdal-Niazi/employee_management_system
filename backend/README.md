@@ -26,7 +26,7 @@ the employees whose `managerId` is that employee, and HR sets that by editing an
 | `/api/attendance` (a day's attendance for everyone, write, correct or remove a check-in) | `HR_ADMIN` |
 | `/api/leave-requests` (everyone's leave, approve or reject any pending request) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, the team's attendance, leave requests, approve/reject) | `MANAGER`, own team only |
-| `/api/me/...` (own profile, attendance, check in and out, leave requests, request or cancel leave) | `EMPLOYEE` and `MANAGER`, own data only |
+| `/api/me/...` (own profile, attendance, check in and out, leave requests and balance, request or cancel leave) | `EMPLOYEE` and `MANAGER`, own data only |
 | `GET /health` | anyone; `{ "status": "ok" }` or 503 when the database is unreachable |
 
 ## Attendance rules
@@ -37,6 +37,16 @@ not in yet, and a finished weekday is absent. The shift (09:00 to 17:00) and the
 period for late are in `src/services/attendanceService.js`, and times use the server's clock.
 Employees check in and out themselves with `POST /api/me/check-in` and `/api/me/check-out`; HR can
 correct any day.
+
+## Leave balance
+
+Everyone gets the same working days of leave per calendar year, set in `.env`:
+`LEAVE_ANNUAL_DAYS` (default 14), `LEAVE_SICK_DAYS` (8) and `LEAVE_CASUAL_DAYS` (6). A request counts
+towards the year its first day falls in, only Monday to Friday days are counted, and it is refused
+with a 409 if it needs more days than are left of that kind. Approved days are used up and days
+waiting for a decision are held back, so asking twice can't get past the limit; rejected and
+cancelled requests give their days back. `GET /api/me/leave-balance?year=` shows the numbers.
+Nothing carries over to the next year.
 
 ## Tests
 
