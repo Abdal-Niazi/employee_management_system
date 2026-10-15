@@ -82,9 +82,9 @@ Own attendance (`EMPLOYEE` and `MANAGER` accounts, always the account's own empl
 |---|---|
 | `GET /api/me/attendance/today` | optional header `X-Device-Key`; `{ today, workday, shift, record, canCheckIn, canCheckOut, notice, device, deviceRegistered }`; `notice` says why check-in is off; `device` is null or `{ status, platform, thisPhone }` |
 | `POST /api/me/device` | registers this phone with the key it made: `{ key, platform: "android" \| "ios" }`; 201 `{ device }`, waiting for HR; again while waiting replaces it; 409 once one is approved |
-| `POST /api/me/attendance/check-in` | header `X-Device-Key: <key>` of the approved phone; starts today's record at the server's time; returns the same object as today. `POST /api/me/check-in` is the same (the path older app builds use) |
-| `POST /api/me/attendance/check-out` | header `X-Device-Key: <key>`; ends it; returns the same object. Also `POST /api/me/check-out` |
-| `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` (also as `attendance`, for older app builds) |
+| `POST /api/me/attendance/check-in` | header `X-Device-Key: <key>` of the approved phone; starts today's record at the server's time; returns the same object as today |
+| `POST /api/me/attendance/check-out` | header `X-Device-Key: <key>`; ends it; returns the same object |
+| `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` |
 | `GET /api/me` | own profile: `{ employee }`, with `manager` (or null) |
 | `GET /api/me/leave-requests` | own leave, pending first: `{ today, leaveRequests }` |
 | `GET /api/me/leave-balance?year=` | `{ year, balances: [{ type, entitlement, used, pending, remaining }] }` (default: this year) |
@@ -113,8 +113,8 @@ HR routes for it (`HR_ADMIN`):
 
 | Route | Does |
 |---|---|
-| `GET /api/employees/:id/device` | `{ registered, device }`; device is `{ status, platform, registeredAt, approvedAt, approvedBy, lastUsedAt }` or null |
-| `POST /api/employees/:id/device/approve` | optional `{ registeredAt }` of the phone HR looked at (409 if another one replaced it since, or it is already approved; 404 if none waits) |
+| `GET /api/employees/:id/device` | `{ registered, device }`; device is `{ status, platform, registeredAt, approvedAt, approvedBy, lastUsedAt }` or null; `lastUsedAt` is the last check-in or check-out that went through |
+| `POST /api/employees/:id/device/approve` | `{ registeredAt }` of the phone HR looked at, required (422 without it; 409 if another one replaced it since, or it is already approved; 404 if none waits) |
 | `DELETE /api/employees/:id/device` | rejects a waiting phone, or resets a lost or replaced one; the person registers again |
 
 The employee list has `phoneStatus` (null, `PENDING` or `APPROVED`) on each employee. In the app,
@@ -170,6 +170,11 @@ day, and today's times can't be later than now; weekends are fine. Every HR chan
 (`source: "HR"`) with who made it, when, the times before and the note ("Changed by HR" or "Check-in
 removed by HR" without one), so managers and employees see "Corrected by HR". These history rows
 aren't requests, so they don't appear in the correction lists.
+
+**Deleting an employee** (`DELETE /api/employees/:id`) also deletes their leave, attendance and
+registered phone. Their attendance changes are history and stay: each row keeps the person's
+employee ID and name (`employeeCode`, `employeeName`), and its `employeeId` becomes null. Requests
+still waiting for HR are removed, since nobody can decide them any more.
 
 ## Leave balance
 
