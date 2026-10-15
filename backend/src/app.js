@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const prisma = require("./utils/prisma");
-const { apiLimiter, loginLimiter } = require("./middleware/rateLimits");
+const { addressLimiter, loginLimiter } = require("./middleware/rateLimits");
 const authRoutes = require("./routes/authRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const managerRoutes = require("./routes/managerRoutes");
@@ -39,7 +39,7 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
 
-app.use("/api", apiLimiter);
+app.use("/api", addressLimiter);
 app.use("/api/auth/login", loginLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);

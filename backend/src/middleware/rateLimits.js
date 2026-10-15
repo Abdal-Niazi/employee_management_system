@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
 // Behind a reverse proxy set TRUST_PROXY (e.g. 1) so req.ip is the real client's address,
@@ -13,30 +12,35 @@ const limiter = (limit, windowMs, options = {}) =>
     ...options,
   });
 
-// Failed sign-ins count per address AND email. A whole office shares one address on its Wi-Fi,
-// so a few typos must not lock everyone else out; guessing one account's password is still cut off.
+const ipKey = (req) => `ip:${ipKeyGenerator(req.ip)}`;
+
+// Failed sign-ins count per address AND email, so a few typos on a shared office Wi-Fi don't lock
+// everyone else out while guessing one account's password is still cut off...
 const loginKey = (req) => {
   const email = String(req.body?.email ?? "").trim().toLowerCase().slice(0, 254);
   return `${ipKeyGenerator(req.ip)}|${email}`;
 };
 
-// Signed-in requests count per login token, so an office behind one address doesn't share one
-// allowance; everything else counts per address. Only a hash of the token is kept in memory.
-const apiKey = (req) => {
-  const [scheme, token] = (req.headers.authorization || "").split(" ");
-  if (scheme === "Bearer" && token) {
-    return `token:${crypto.createHash("sha256").update(token).digest("base64url")}`;
-  }
-  return `ip:${ipKeyGenerator(req.ip)}`;
-};
-
-// Failed logins only, so a brute-force attempt is cut off without locking out real users.
-const loginLimiter = limiter(Number(process.env.LOGIN_RATE_LIMIT) || 10, 15 * 60 * 1000, {
+// ...and per address as well, with a bigger allowance, so one address can't try a password
+// against every account.
+const loginAccountLimiter = limiter(Number(process.env.LOGIN_RATE_LIMIT) || 10, 15 * 60 * 1000, {
   skipSuccessfulRequests: true,
   keyGenerator: loginKey,
   message: { message: "Too many failed sign-in attempts, please try again in 15 minutes" },
 });
+const loginAddressLimiter = limiter(Number(process.env.LOGIN_IP_RATE_LIMIT) || 50, 15 * 60 * 1000, {
+  skipSuccessfulRequests: true,
+  keyGenerator: ipKey,
+  message: { message: "Too many failed sign-in attempts from this network, please try again in 15 minutes" },
+});
+const loginLimiter = [loginAddressLimiter, loginAccountLimiter];
 
-const apiLimiter = limiter(Number(process.env.API_RATE_LIMIT) || 300, 60 * 1000, { keyGenerator: apiKey });
+// Every API request counts per address before anything else, whatever token it carries (a made-up
+// token doesn't get a fresh allowance). The allowance is big enough for an office on one address.
+const addressLimiter = limiter(Number(process.env.IP_RATE_LIMIT) || 1000, 60 * 1000, { keyGenerator: ipKey });
 
-module.exports = { loginLimiter, apiLimiter, loginKey, apiKey };
+// Once the token is verified, each signed-in account also has its own allowance (see requireAuth).
+const userKey = (req) => `user:${req.admin.id}`;
+const userLimiter = limiter(Number(process.env.API_RATE_LIMIT) || 300, 60 * 1000, { keyGenerator: userKey });
+
+module.exports = { loginLimiter, addressLimiter, userLimiter, ipKey, loginKey, userKey };
