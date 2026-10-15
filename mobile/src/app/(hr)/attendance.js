@@ -135,7 +135,7 @@ export default function HrAttendanceScreen() {
 
   return (
     <View style={styles.screen}>
-      {shown && <DayNav date={shown} today={today} shift={data?.shift} onChange={setDate} />}
+      {shown && <DayNav date={shown} today={today} shift={data?.workday ? data.shift : null} onChange={setDate} />}
       {body}
       <AttendanceSheet
         row={selected}
