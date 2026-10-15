@@ -40,6 +40,11 @@ const registerDevice = async (employee, { platform }) => {
 
 // Throws unless `key` is the key of this person's registered phone.
 const verifyDevice = async (employee, key) => {
+  // Only app builds from before registered phones send no key at all
+  if (key === undefined) {
+    throw new AppError("Update the app to check in: check-in now works only from your registered phone", 403);
+  }
+
   const device = await getDevice(employee.id);
   if (!device) {
     throw new AppError("Register this phone before checking in", 403);

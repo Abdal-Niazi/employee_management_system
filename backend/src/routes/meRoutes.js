@@ -21,6 +21,12 @@ router.post("/attendance/check-in", meController.checkIn);
 
 router.post("/attendance/check-out", meController.checkOut);
 
+// The paths app builds from before registered phones use. Same rules: without the phone's key
+// they get a 403 that says to update the app.
+router.post("/check-in", meController.checkIn);
+
+router.post("/check-out", meController.checkOut);
+
 router.get("/attendance", meController.getAttendance);
 
 router.post("/device", validate(registerDeviceSchema), meController.registerDevice);

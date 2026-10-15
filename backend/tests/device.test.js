@@ -75,6 +75,22 @@ describe("registered phones", () => {
     assert.ok(device.lastUsedAt);
   });
 
+  test("app builds from before registered phones keep their paths and are told to update", async () => {
+    for (const path of ["/api/me/check-in", "/api/me/check-out"]) {
+      const res = await request(app).post(path).set(employee);
+      assert.equal(res.status, 403);
+      assert.match(res.body.message, /Update the app/);
+    }
+
+    // The old path works like the new one with the phone's key
+    const res = await request(app).post("/api/me/check-in").set(employee).set("X-Device-Key", key);
+    assert.notEqual(res.status, 403);
+
+    // The old name for the days is still in the answer
+    const history = await request(app).get("/api/me/attendance?days=3").set(employee);
+    assert.deepEqual(history.body.attendance, history.body.records);
+  });
+
   test("another person's key doesn't work for you", async () => {
     const managerKey = (await register(manager)).body.key;
     assert.equal((await checkIn(employee, managerKey)).status, 403);

@@ -83,6 +83,8 @@ const getAttendance = async (req, res) => {
   res.status(200).json({
     message: "Attendance retrieved successfully",
     ...history,
+    // The same days under the name app builds from before this version read
+    attendance: history.records,
   });
 };
 
