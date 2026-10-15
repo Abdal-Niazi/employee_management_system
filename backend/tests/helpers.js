@@ -1,4 +1,5 @@
 // Shared setup for the API tests. Only ever runs against TEST_DATABASE_URL (see scripts/test.js).
+const crypto = require("crypto");
 const request = require("supertest");
 const app = require("../src/app");
 const prisma = require("../src/utils/prisma");
@@ -73,4 +74,17 @@ const login = async (email) => {
   return { Authorization: `Bearer ${res.body.token}` };
 };
 
-module.exports = { app, prisma, request, PASSWORD, resetDatabase, seedFixtures, login, account };
+// A phone's key, made the way the app makes it
+const newDeviceKey = () => crypto.randomBytes(32).toString("base64url");
+
+// Registers a phone for the signed-in account and approves it the way HR would. Returns the
+// headers of that account on that phone (its key goes with every request).
+const onApprovedPhone = async (auth, employeeId) => {
+  const key = newDeviceKey();
+  const res = await request(app).post("/api/me/device").set(auth).send({ platform: "android", key });
+  if (res.status !== 201) throw new Error(`Phone registration failed: ${res.status}`);
+  await prisma.registeredDevice.update({ where: { employeeId }, data: { status: "APPROVED", approvedAt: new Date() } });
+  return { ...auth, "X-Device-Key": key };
+};
+
+module.exports = { app, prisma, request, PASSWORD, resetDatabase, seedFixtures, login, account, newDeviceKey, onApprovedPhone };

@@ -1,6 +1,6 @@
 const { after, before, describe, test } = require("node:test");
 const assert = require("node:assert/strict");
-const { app, prisma, request, seedFixtures, login } = require("./helpers");
+const { app, prisma, request, seedFixtures, login, onApprovedPhone } = require("./helpers");
 const attendanceService = require("../src/services/attendanceService");
 const { createAdminSchema } = require("../src/validators/authSchema");
 const { addDays, asDbDate, fromCompanyTime, isWeekend, todayKey } = require("../src/utils/companyTime");
@@ -143,13 +143,8 @@ describe("the /api/me API (real clock)", () => {
     data = await seedFixtures();
 
     // Signed in, on their registered phone (its key goes with every request)
-    const onRegisteredPhone = async (email) => {
-      const auth = await login(email);
-      const { body } = await request(app).post("/api/me/device").set(auth).send({ platform: "android" });
-      return { ...auth, "X-Device-Key": body.key };
-    };
-    employee = await onRegisteredPhone("employee.a1@example.com");
-    manager = await onRegisteredPhone("manager.a@example.com");
+    employee = await onApprovedPhone(await login("employee.a1@example.com"), data.a1.id);
+    manager = await onApprovedPhone(await login("manager.a@example.com"), data.managerA.id);
   });
 
   test("today's card comes with the company's day", async () => {

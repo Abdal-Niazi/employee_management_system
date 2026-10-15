@@ -4,7 +4,7 @@ import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-nativ
 import { checkIn, checkOut, getMyDay, registerDevice } from "../api/me";
 import { useAuth } from "../auth/AuthContext";
 import { confirmIdentity } from "../auth/confirmIdentity";
-import { clearDeviceKey, loadDeviceKey, saveDeviceKey } from "../auth/deviceKey";
+import { clearDeviceKey, loadDeviceKey, makeDeviceKey, saveDeviceKey } from "../auth/deviceKey";
 import { useAsync } from "../hooks/useAsync";
 import { colors, font, radius, spacing } from "../theme";
 import { formatDay } from "../utils/date";
@@ -26,16 +26,19 @@ function Notice({ icon = "information-circle-outline", color = colors.muted, chi
 
 // The signed-in person's own day: check in, check out, or why neither is possible. Shown on the
 // employee's Today tab and on the manager's Overview. Check-in only works from the person's one
-// registered phone, after its fingerprint/face (or PIN) prompt; the server's clock sets the
-// times, and the server decides what is allowed, so the buttons only follow its answers.
+// registered phone, once HR has approved it, after its fingerprint/face (or PIN) prompt; the
+// server's clock sets the times, and the server decides what is allowed, so the buttons only
+// follow its answers.
 export default function CheckInCard({ title = "Your attendance today" }) {
   const { user } = useAuth();
   const accountId = user.id;
 
   const load = useCallback(async () => {
-    const [day, deviceKey] = await Promise.all([getMyDay(), loadDeviceKey(accountId)]);
-    // HR reset this person's phone: the old key is useless now, so forget it here as well.
-    if (!day.deviceRegistered && deviceKey) {
+    const deviceKey = await loadDeviceKey(accountId);
+    const day = await getMyDay(deviceKey);
+    // No phone is registered (HR reset or rejected it): the old key is useless, so forget it here
+    // as well, and registering again makes a fresh one.
+    if (!day.device && deviceKey) {
       await clearDeviceKey(accountId);
       return { ...day, deviceKey: null };
     }
@@ -65,8 +68,10 @@ export default function CheckInCard({ title = "Your attendance today" }) {
   const registerThisPhone = () =>
     act(async () => {
       await confirmIdentity("Confirm it's you to register this phone");
-      const { key } = await registerDevice(Platform.OS);
+      // Saved before it is sent: if the answer gets lost, a retry sends the same key.
+      const key = data.deviceKey ?? makeDeviceKey();
       await saveDeviceKey(accountId, key);
+      await registerDevice(Platform.OS, key);
     });
 
   const doCheckIn = () =>
@@ -98,11 +103,15 @@ export default function CheckInCard({ title = "Your attendance today" }) {
     );
   }
 
-  const { today, workday, shift, record, canCheckIn, canCheckOut, notice, deviceRegistered, deviceKey } = data;
+  const { today, workday, shift, record, canCheckIn, canCheckOut, notice, device } = data;
   const done = Boolean(record.checkIn && record.checkOut);
   // The day allows an action; whether this phone may do it is checked separately.
   const wantsAction = canCheckIn || canCheckOut;
-  const onRegisteredPhone = !isWeb && deviceRegistered && Boolean(deviceKey);
+  const thisPhone = Boolean(device?.thisPhone);
+  const onRegisteredPhone = !isWeb && device?.status === "APPROVED" && thisPhone;
+  const registerButton = (label) => (
+    <Button title={label} icon="finger-print" loading={busy} onPress={registerThisPhone} style={styles.action} />
+  );
 
   return (
     <Card title={title} right={<StatusPill status={record.status} />}>
@@ -124,21 +133,30 @@ export default function CheckInCard({ title = "Your attendance today" }) {
       {isWeb && wantsAction && (
         <Notice icon="phone-portrait-outline">Check-in works only in the EMS app on your registered phone.</Notice>
       )}
-      {!isWeb && !deviceRegistered && (
+      {!isWeb && !device && (
         <>
           <Notice icon="phone-portrait-outline">
-            You check in from one registered phone. Register this one to start; it asks for your fingerprint or face.
+            You check in from one registered phone. Register this one to start; it asks for your fingerprint or
+            face, and then HR approves it.
           </Notice>
-          <Button
-            title="Register this phone"
-            icon="finger-print"
-            loading={busy}
-            onPress={registerThisPhone}
-            style={styles.action}
-          />
+          {registerButton("Register this phone")}
         </>
       )}
-      {!isWeb && deviceRegistered && !deviceKey && (
+      {!isWeb && device?.status === "PENDING" && thisPhone && (
+        <Notice icon="time-outline" color={colors.warning}>
+          This phone is waiting for HR to approve it. Once they do, you can check in here.
+        </Notice>
+      )}
+      {!isWeb && device?.status === "PENDING" && !thisPhone && (
+        <>
+          <Notice icon="alert-circle-outline" color={colors.warning}>
+            Another phone is waiting for HR to approve it for your account. If that isn&apos;t yours, tell HR. To use
+            this phone instead, register it.
+          </Notice>
+          {registerButton("Register this phone instead")}
+        </>
+      )}
+      {!isWeb && device?.status === "APPROVED" && !thisPhone && (
         <Notice icon="alert-circle-outline" color={colors.warning}>
           This isn&apos;t your registered phone. If you changed phones, ask HR to reset it.
         </Notice>

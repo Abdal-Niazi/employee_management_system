@@ -25,7 +25,18 @@ const getDevice = async (req, res) => {
   });
 };
 
-// HR: forget a lost or replaced phone, so the person can register their new one.
+// HR: let a waiting phone check in.
+const approveDevice = async (req, res) => {
+  const employee = await findEmployee(req);
+  const device = await deviceService.approveDevice(employee.id, req.admin.id, req.body?.registeredAt);
+
+  res.status(200).json({
+    message: "Phone approved",
+    device,
+  });
+};
+
+// HR: reject a waiting phone, or forget a lost or replaced one, so the person can register again.
 const resetDevice = async (req, res) => {
   const employee = await findEmployee(req);
   await deviceService.resetDevice(employee.id);
@@ -37,5 +48,6 @@ const resetDevice = async (req, res) => {
 
 module.exports = {
   getDevice,
+  approveDevice,
   resetDevice,
 };

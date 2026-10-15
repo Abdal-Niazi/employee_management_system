@@ -3,7 +3,7 @@ import { request } from "./client";
 // The signed-in person's own attendance, for employees and managers alike. The server works out
 // who that is from the account, and its own clock sets the check-in and check-out times.
 
-const toDay = ({ today, workday, shift, record, canCheckIn, canCheckOut, notice, deviceRegistered }) => ({
+const toDay = ({ today, workday, shift, record, canCheckIn, canCheckOut, notice, device }) => ({
   today,
   workday,
   shift,
@@ -11,25 +11,28 @@ const toDay = ({ today, workday, shift, record, canCheckIn, canCheckOut, notice,
   canCheckIn,
   canCheckOut,
   notice,
-  deviceRegistered,
+  device,
 });
 
 // Check-in and check-out only count from the registered phone, which proves it with its key.
 const withDeviceKey = (deviceKey) => ({ method: "POST", headers: { "X-Device-Key": deviceKey } });
 
 // GET /api/me/attendance/today
-// -> { today, workday, shift, record, canCheckIn, canCheckOut, notice, deviceRegistered }
-export async function getMyDay() {
-  return toDay(await request("/api/me/attendance/today"));
+// -> { today, workday, shift, record, canCheckIn, canCheckOut, notice, device }
+// device: null (no phone registered) or { status: "PENDING" | "APPROVED", platform, thisPhone }.
+// The phone sends its key, if it has one, so the server can say whether it is the registered one.
+export async function getMyDay(deviceKey) {
+  return toDay(await request("/api/me/attendance/today", deviceKey ? { headers: { "X-Device-Key": deviceKey } } : {}));
 }
 
-// POST /api/me/device -> { key, device }. The key is sent only this once.
-export async function registerDevice(platform) {
-  const { key, device } = await request("/api/me/device", {
+// POST /api/me/device with the key this phone made (and already saved) -> the device, waiting
+// for HR to approve it.
+export async function registerDevice(platform, key) {
+  const { device } = await request("/api/me/device", {
     method: "POST",
-    body: JSON.stringify({ platform }),
+    body: JSON.stringify({ platform, key }),
   });
-  return { key, device };
+  return device;
 }
 
 // POST /api/me/attendance/check-in -> the updated day

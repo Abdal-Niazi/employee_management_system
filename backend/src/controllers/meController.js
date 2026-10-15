@@ -33,21 +33,25 @@ const getProfile = async (req, res) => {
 const getToday = async (req, res) => {
   const employee = await resolveSelf(req);
   const day = await attendanceService.getMyDay(employee);
+  // The phone sends its key, if it has one, to learn whether it is the registered phone.
+  const device = await deviceService.ownDevice(employee.id, req.get(deviceService.DEVICE_KEY_HEADER));
 
   res.status(200).json({
     message: "Today retrieved successfully",
     ...day,
-    deviceRegistered: await deviceService.isRegistered(employee.id),
+    deviceRegistered: Boolean(device),
+    device,
   });
 };
 
-// The first time on a phone: makes it the one this person checks in from.
+// The first time on a phone: asks for it to be the one this person checks in from. It can check
+// in once an HR admin approves it.
 const registerDevice = async (req, res) => {
-  const result = await deviceService.registerDevice(await resolveSelf(req), req.body);
+  const device = await deviceService.registerDevice(await resolveSelf(req), req.body);
 
   res.status(201).json({
-    message: "Phone registered",
-    ...result,
+    message: "Phone registered. HR needs to approve it before you can check in.",
+    device,
   });
 };
 

@@ -133,19 +133,26 @@ model Admin {
   correctionDecisions AttendanceCorrection[] @relation("CorrectionDecider")
   // Leave requests this HR admin approved or rejected
   decidedLeave        LeaveRequest[]         @relation("LeaveDecidedByAdmin")
+  approvedDevices     RegisteredDevice[]     @relation("DeviceApprover")
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 }
 
-// The one phone a person checks in from. The phone keeps a random key and sends it with every
-// check-in and check-out; the server keeps only the key's SHA-256 hash. HR removes the row when
-// the phone is lost or replaced, and the person registers the new one.
+// The one phone a person checks in from. The phone makes a random key, keeps it and sends it with
+// every check-in and check-out; the server keeps only the key's SHA-256 hash. A new phone waits
+// (PENDING) until an HR admin approves it. HR removes the row to reject a waiting phone or to
+// reset a lost or replaced one, and the person registers the new one.
 model RegisteredDevice {
-  id         Int       @id @default(autoincrement())
-  employeeId Int       @unique
-  employee   Employee  @relation("EmployeeDevice", fields: [employeeId], references: [id], onDelete: Cascade)
-  keyHash    String
-  platform   String? // android or ios
-  createdAt  DateTime  @default(now()) // when it was registered
-  lastUsedAt DateTime?
+  id           Int       @id @default(autoincrement())
+  employeeId   Int       @unique
+  employee     Employee  @relation("EmployeeDevice", fields: [employeeId], references: [id], onDelete: Cascade)
+  keyHash      String
+  platform     String? // android or ios
+  status       String    @default("PENDING") // PENDING, APPROVED
+  // The HR admin account that approved it
+  approvedById Int?
+  approvedBy   Admin?    @relation("DeviceApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now()) // when it was registered
+  lastUsedAt   DateTime?
 }

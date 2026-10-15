@@ -17,11 +17,13 @@ const getEmployees = async ({ page, pageSize }) => {
       },
       skip: (page - 1) * pageSize,
       take: pageSize,
+      include: { device: { select: { status: true } } },
     }),
     prisma.employee.count(),
   ]);
 
-  return { employees, total };
+  // phoneStatus: null (no phone), PENDING (waiting for HR) or APPROVED, so the list can flag waiting ones
+  return { employees: employees.map(({ device, ...employee }) => ({ ...employee, phoneStatus: device?.status ?? null })), total };
 };
 
 const getEmployeeById = async (id) => {

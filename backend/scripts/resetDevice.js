@@ -1,10 +1,10 @@
-// HR: forgets an employee's registered phone (lost or replaced), so they can register their new one.
-// Run from backend: npm run reset-device -- <employee database id>
+// HR: forgets an employee's registered phone (lost or replaced, or waiting and not theirs), so they
+// can register their new one. The HR app does the same with "Reset phone" on the employee's screen.
+// Run from backend: npm run reset-device -- EMP001   (the employee ID shown in the app)
 require("dotenv").config({ quiet: true });
 
 const prisma = require("../src/utils/prisma");
 const deviceService = require("../src/services/deviceService");
-const parseId = require("../src/utils/parseId");
 
 const fail = (message) => {
   console.error(message);
@@ -12,15 +12,12 @@ const fail = (message) => {
 };
 
 const main = async () => {
-  let id;
-  try {
-    id = parseId(process.argv[2], "The employee database id");
-  } catch (error) {
-    return fail(`${error.message}. Usage: npm run reset-device -- <employee database id>`);
-  }
+  const code = (process.argv[2] ?? "").trim();
+  if (!code) return fail("Give the employee ID shown in the app. Usage: npm run reset-device -- EMP001");
 
-  const employee = await prisma.employee.findUnique({ where: { id } });
-  if (!employee) return fail(`No employee has id ${id}`);
+  const employee = await prisma.employee.findUnique({ where: { employeeId: code } });
+  if (!employee) return fail(`No employee has the ID ${code}`);
+  const { id } = employee;
 
   const name = `${employee.firstName} ${employee.lastName} (${employee.employeeId})`;
   try {

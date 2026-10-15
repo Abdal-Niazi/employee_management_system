@@ -4,6 +4,7 @@ const deviceController = require("../controllers/deviceController");
 const validate = require("../middleware/validate");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
+const { approveDeviceSchema } = require("../validators/deviceSchema");
 const { createEmployeeSchema, updateEmployeeSchema } = require("../validators/employeeSchema");
 
 const router = express.Router();
@@ -22,8 +23,11 @@ router.patch("/:id", validate(updateEmployeeSchema), employeeController.updateEm
 
 router.delete("/:id", employeeController.deleteEmployee);
 
-// A person's registered phone (they check in from it). Reset it when the phone is lost or replaced.
+// A person's registered phone (they check in from it). A new one waits for approval; delete it
+// to reject it, or to reset a lost or replaced one.
 router.get("/:id/device", deviceController.getDevice);
+
+router.post("/:id/device/approve", validate(approveDeviceSchema), deviceController.approveDevice);
 
 router.delete("/:id/device", deviceController.resetDevice);
 

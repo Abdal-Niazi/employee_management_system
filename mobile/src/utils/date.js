@@ -49,6 +49,11 @@ export function formatIsoDate(iso) {
   });
 }
 
+// A real moment (e.g. when a phone was registered), in the phone's own time: "15 Oct, 09:42".
+export function formatMoment(iso) {
+  return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 // Typed times to "HH:MM": "9:20", "0920" and "920" all become "09:20". Anything else is null.
 export function normalizeTime(text) {
   const match = /^(\d{1,2}):?(\d{2})$/.exec(text.trim());

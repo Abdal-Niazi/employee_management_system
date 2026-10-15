@@ -34,6 +34,27 @@ export async function deleteEmployee(id) {
   await request(`/api/employees/${id}`, { method: "DELETE" });
 }
 
+// The phone an employee checks in from. null when none is registered, otherwise
+// { status: "PENDING" | "APPROVED", platform, registeredAt, approvedAt, approvedBy, lastUsedAt }.
+export async function getEmployeeDevice(id) {
+  const { device } = await request(`/api/employees/${id}/device`);
+  return device;
+}
+
+// registeredAt is the waiting phone HR looked at; if another phone replaced it since, the server refuses.
+export async function approveEmployeeDevice(id, registeredAt) {
+  const { device } = await request(`/api/employees/${id}/device/approve`, {
+    method: "POST",
+    body: JSON.stringify({ registeredAt }),
+  });
+  return device;
+}
+
+// Rejects a waiting phone, or forgets a lost or replaced one, so the person can register again.
+export async function resetEmployeeDevice(id) {
+  await request(`/api/employees/${id}/device`, { method: "DELETE" });
+}
+
 // Leave: HR admins see everyone's requests and can decide any of them (managers decide their team's).
 
 // status: PENDING, APPROVED or REJECTED (no status = all)
