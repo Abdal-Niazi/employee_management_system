@@ -58,6 +58,7 @@ All calls go through `src/api/hr.js`.
 | Screen | Backend |
 |---|---|
 | Employees: list, search, details, add, edit, delete | `GET/POST /api/employees`, `GET/PATCH/DELETE /api/employees/:id` |
+| Employee's check-in phone: approve, reject, reset | `GET /api/employees/:id/device`, `POST /api/employees/:id/device/approve`, `DELETE /api/employees/:id/device` |
 | Leave: every employee's requests, approve or reject any | `GET /api/leave-requests?status=`, `PATCH /api/leave-requests/:id` |
 | Attendance: everyone's day | `GET /api/attendance?date=`, `PUT /api/attendance`, `DELETE /api/attendance/:employeeId/:date` |
 | Requests from managers | `GET /api/attendance-corrections?status=`, `PATCH /api/attendance-corrections/:id` |
@@ -87,7 +88,8 @@ attendance.** On the Attendance tab, tapping a person (today and the 6 days befo
 ask HR for a correction with a reason. The day then shows "Correction waiting for HR"; only an HR
 approval changes it ("Corrected by HR"). **My correction requests** lists every request and HR's
 answer. Team members whose record isn't active show as "Inactive" instead of "Absent", aren't
-counted, and can't be corrected from the app (HR handles them).
+counted, and can't be corrected from the app (HR handles them). Weekends show everyone too (as
+"Off", or present for anyone who worked), with a short note that no shift is scheduled.
 
 ## Employee screens (and checking in)
 
@@ -102,18 +104,22 @@ All calls go through `src/api/me.js` (`/api/me/...`, always the signed-in person
 
 `CheckInCard` shows **Check in**, then **Check out** (which asks once more, since a check-out can't
 be undone), then "Done for today". The server's clock sets the times and the server decides what
-is allowed: on weekends, on approved leave, before the first day or for an employee who isn't
-active, the card shows the server's reason instead of a button. A forgotten or wrong time is fixed
+is allowed: on approved leave, before the first day or for an employee who isn't active, the card
+shows the server's reason instead of a button. Weekends have no shift, but check-in works there
+too, for anyone who works one. A forgotten or wrong time is fixed
 by the manager's correction request to HR, or by HR directly.
 
-**Registered phone + fingerprint.** People check in from one registered phone. The first time,
-the card offers **Register this phone**: the phone asks for its fingerprint or face (or its PIN if
-those aren't set up), then saves the key the server sends in `expo-secure-store`
-(`src/auth/deviceKey.js`). Every check-in and check-out asks for the fingerprint again
-(`src/auth/confirmIdentity.js`) and sends the key; the phone does the fingerprint check itself, so
-nothing biometric leaves it. On another phone the card says it isn't the registered one, and HR
-resets a lost or replaced phone (`npm run reset-device -- <id>` in `backend/`). The web app can't
-check in at all.
+**Registered phone + fingerprint.** People check in from one registered phone, which an HR admin
+approves. The first time, the card offers **Register this phone**: the phone asks for its
+fingerprint or face (or its PIN if those aren't set up), makes a random key (`expo-crypto`), saves
+it in `expo-secure-store` first and then registers it (`src/auth/deviceKey.js`), so a lost answer
+can't leave it registered without its key. The card then says the phone is waiting for HR. On the
+employee's screen HR sees **Check-in phone** with **Approve** and **Reject** (and **Reset phone**
+once approved); the Employees list marks phones waiting for approval. Once approved, every check-in
+and check-out asks for the fingerprint again (`src/auth/confirmIdentity.js`) and sends the key; the
+phone does the fingerprint check itself, so nothing biometric leaves it. On another phone the card
+says it isn't the registered one, and HR resets a lost or replaced phone (or
+`npm run reset-device -- EMP001` in `backend/`). The web app can't check in at all.
 
 In Expo Go the fingerprint works on Android; iPhone Face ID needs a development build, so Expo Go
 asks for the iPhone's passcode instead. A phone without any screen lock can't check in.

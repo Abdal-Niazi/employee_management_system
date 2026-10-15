@@ -12,9 +12,9 @@ approve their team's leave, and employees check in and out and ask for leave fro
 
 | Role | What they do in the app |
 |---|---|
-| **HR admin** | Adds, edits and deletes employees, writes or corrects attendance, and sees and decides everyone's leave (this is how leave gets decided for people with no manager) |
-| **Manager** | Sees their own team, the team's attendance for a day, and approves or rejects the team's leave |
-| **Employee** | Checks in and out, sees their profile and manager, their attendance, and asks for or cancels leave |
+| **HR admin** | Adds, edits and deletes employees, approves the phone each person checks in from, writes or corrects attendance (and approves managers' correction requests), and sees and decides everyone's leave (this is how leave gets decided for people with no manager) |
+| **Manager** | Sees their own team, the team's attendance for a day (and asks HR to correct a wrong one), approves or rejects the team's leave, and checks in like an employee |
+| **Employee** | Checks in and out from their registered phone (with a fingerprint), sees their profile and manager, their attendance and leave balance, and asks for or cancels leave |
 
 Manager and employee accounts each belong to one employee. Everyone signs in with an email and a
 password, and the server decides which screens they get from their role.
@@ -53,5 +53,6 @@ You need Node.js 20.19 or newer and PostgreSQL.
   `npx expo lint` in `mobile/`.
 - **Branches:** one branch per piece of work, opened as a pull request into `main`.
 - **Rules built in:** a day without a check-in counts as absent only after the shift ends;
-  check-in after 09:05 is late; leave counts Monday to Friday and can't overlap another request.
-  The shift (09:00 to 17:00) lives in `backend/src/services/attendanceService.js`.
+  check-in after 09:05 is late; weekends have no shift, but anyone who works one checks in as
+  usual; leave counts Monday to Friday, can't overlap another request or go past the year's
+  balance. The shift (09:00 to 17:00), the timezone and the leave days are set in `backend/.env`.

@@ -9,7 +9,7 @@ npm install
 cp .env.example .env          # then fill in DATABASE_URL and JWT_SECRET
 npm run migrate:deploy        # create or update the tables
 npm run create-admin          # an HR_ADMIN account, or a MANAGER / EMPLOYEE linked to an employee
-npm run reset-device -- 12    # HR: forget employee 12's lost or replaced phone (see below)
+npm run reset-device -- EMP001  # HR: forget EMP001's lost or replaced phone (the app has a button too)
 npm run seed                  # optional: sample leave requests and six weeks of attendance
 npm start                     # http://localhost:5000
 ```
@@ -24,7 +24,7 @@ employee account checks that employee in and out. One account per employee.
 | Route | Who |
 |---|---|
 | `POST /api/auth/login`, `GET /api/auth/me` | anyone / any signed-in account |
-| `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET`/`DELETE /:id/device` for the registered phone) | `HR_ADMIN` |
+| `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET /:id/device`, `POST /:id/device/approve` and `DELETE /:id/device` for the check-in phone) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
 | `/api/attendance` (everyone's day; write, fix or remove a check-in) | `HR_ADMIN` |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
@@ -44,13 +44,17 @@ One shift for everyone, Monday to Friday, set in `.env`: `SHIFT_START` (09:00), 
 (17:00), `LATE_GRACE_MINUTES` (5) and `COMPANY_TIMEZONE` (Asia/Karachi). Times in requests and
 responses are `"HH:MM"` in that timezone; days are `"YYYY-MM-DD"`.
 
+Weekends have no shift, but someone who works one checks in as usual, and HR and managers can fix
+that day like any other.
+
 A day's status, checked in this order:
 
 | Status | When |
 |---|---|
-| `OFF` | Saturday, Sunday, or before the hire date |
+| `OFF` | before the hire date |
+| `PRESENT` / `LATE` | checked in (even on a weekend, or on leave approved afterwards); late if more than the grace minutes after the shift start, never on a weekend |
+| `OFF` | Saturday or Sunday without a check-in |
 | `ON_LEAVE` | an approved leave request covers the day |
-| `PRESENT` / `LATE` | checked in; late if more than the grace minutes after the shift start |
 | `INACTIVE` | no check-in, and the employee's `status` isn't `active` (left or on hold), so they aren't expected at work |
 | `NOT_IN` | no check-in yet today, and the shift hasn't ended |
 | `ABSENT` | no check-in |
@@ -68,20 +72,22 @@ A record is `{ date, status, checkIn, checkOut, correction: { id, status } | nul
 `today` is the company's own day, so an app shows that instead of the device's day, which may sit
 in another timezone.
 `correctable` says whether the manager may ask for a correction now. Requests are allowed for
-active employees, for today and the 6 days before it, on work days, not on approved leave, and one waiting request per
-person and day (409 otherwise). Leaving out `checkOut` keeps the recorded check-out.
+active employees, for today and the 6 days before it (weekends too), not on a day of approved leave
+without a check-in, and one waiting request per person and day (409 otherwise; the check and the
+save run in one Serializable transaction). Leaving out `checkOut` keeps the recorded check-out.
 
 Own attendance (`EMPLOYEE` and `MANAGER` accounts, always the account's own employee):
 
 | Route | Does |
 |---|---|
-| `GET /api/me/attendance/today` | `{ today, workday, shift, record, canCheckIn, canCheckOut, notice, deviceRegistered }`; `notice` says why check-in is off |
-| `POST /api/me/device` | registers this phone (`{ platform: "android" \| "ios" }`); 201 `{ key, device }`, the key only this once; 409 if one is already registered |
-| `POST /api/me/attendance/check-in` | header `X-Device-Key: <key>`; starts today's record at the server's time; returns the same object as today |
-| `POST /api/me/attendance/check-out` | header `X-Device-Key: <key>`; ends it; returns the same object |
-| `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` |
+| `GET /api/me/attendance/today` | optional header `X-Device-Key`; `{ today, workday, shift, record, canCheckIn, canCheckOut, notice, device, deviceRegistered }`; `notice` says why check-in is off; `device` is null or `{ status, platform, thisPhone }` |
+| `POST /api/me/device` | registers this phone with the key it made: `{ key, platform: "android" \| "ios" }`; 201 `{ device }`, waiting for HR; again while waiting replaces it; 409 once one is approved |
+| `POST /api/me/attendance/check-in` | header `X-Device-Key: <key>` of the approved phone; starts today's record at the server's time; returns the same object as today. `POST /api/me/check-in` is the same (the path older app builds use) |
+| `POST /api/me/attendance/check-out` | header `X-Device-Key: <key>`; ends it; returns the same object. Also `POST /api/me/check-out` |
+| `GET /api/me/attendance?days=7` | own last 1–31 days, newest first: `{ today, shift, records }` (also as `attendance`, for older app builds) |
 | `GET /api/me` | own profile: `{ employee }`, with `manager` (or null) |
 | `GET /api/me/leave-requests` | own leave, pending first: `{ today, leaveRequests }` |
+| `GET /api/me/leave-balance?year=` | `{ year, balances: [{ type, entitlement, used, pending, remaining }] }` (default: this year) |
 | `POST /api/me/leave-requests` | `{ type: "Annual" \| "Sick" \| "Casual", startDate, endDate, reason? }`; 201 `{ leaveRequest }` |
 | `DELETE /api/me/leave-requests/:id` | cancels an own request while it is still pending (409 once decided) |
 
@@ -89,36 +95,37 @@ Leave counts working days only (no weekends), covers at most 60 days, and is ref
 it overlaps a pending or approved request. The check and the save run in one Serializable
 transaction, so two requests sent at the same moment can't both pass.
 
-## Leave balance
-
-Everyone gets the same working days of leave per calendar year, set in `.env`:
-`LEAVE_ANNUAL_DAYS` (default 14), `LEAVE_SICK_DAYS` (8) and `LEAVE_CASUAL_DAYS` (6). A request counts
-towards the year its first day falls in, only Monday to Friday days are counted, and it is refused
-with a 409 if it needs more days than are left of that kind. Approved days are used up and days
-waiting for a decision are held back, so asking twice can't get past the limit; rejected and
-cancelled requests give their days back. `GET /api/me/leave-balance?year=` shows the numbers.
-Nothing carries over to the next year. The leave lists managers and HR admins decide from carry a
-`balance` on every pending request (what is left of that kind in the year it starts in, with the
-request's own days already held back), and `balance: null` on decided ones.
-
-Check-in is refused on weekends and before the hire date (400), for an employee whose `status`
-isn't `active` (403), on approved leave (409), and a second time the same day (409). Check-out
+Check-in is refused before the hire date (400), for an employee whose `status` isn't `active`
+(403), on approved leave (409), and a second time the same day (409). Check-out
 needs a check-in and works once (409 otherwise). Times always come from the server's clock, never
 the phone's. A forgotten or wrong check-in or check-out is fixed the usual way: the manager asks HR
 for a correction.
 
-**Registered phones.** Each person checks in from one phone. The first time, the app registers it
-and the server returns a random key that the phone keeps in its secure storage; the server stores
-only the key's SHA-256 hash. Check-in and check-out are refused (403) without the right key, so
-nobody can check in from someone else's phone or from a browser. Before sending the key, the app
-asks for the phone's fingerprint or face (or its PIN), and no biometric data ever reaches the server.
-When a phone is lost or replaced, an HR admin resets it (`DELETE /api/employees/:id/device`, or
-`npm run reset-device -- <id>`), and the person registers the new one.
+**Registered phones.** Each person checks in from one phone. The first time, the phone makes a
+random key, saves it in its secure storage and then registers it; the server stores only the key's
+SHA-256 hash. The new phone **waits for an HR admin to approve it**, so knowing someone's password
+isn't enough to register a phone for them. Check-in and check-out are refused (403) without the
+approved phone's key, so nobody can check in from someone else's phone or from a browser. Before
+sending the key, the app asks for the phone's fingerprint or face (or its PIN), and no biometric
+data ever reaches the server.
+
+HR routes for it (`HR_ADMIN`):
+
+| Route | Does |
+|---|---|
+| `GET /api/employees/:id/device` | `{ registered, device }`; device is `{ status, platform, registeredAt, approvedAt, approvedBy, lastUsedAt }` or null |
+| `POST /api/employees/:id/device/approve` | optional `{ registeredAt }` of the phone HR looked at (409 if another one replaced it since, or it is already approved; 404 if none waits) |
+| `DELETE /api/employees/:id/device` | rejects a waiting phone, or resets a lost or replaced one; the person registers again |
+
+The employee list has `phoneStatus` (null, `PENDING` or `APPROVED`) on each employee. In the app,
+HR approves on the employee's screen (**Check-in phone**), ideally with the person and the phone in
+front of them. `npm run reset-device -- EMP001` does the same as **Reset phone**.
 
 Limits worth knowing: the fingerprint prompt is checked by the app, not the server (making the key
 unreadable without a fingerprint needs a development build, not Expo Go); iPhone Face ID needs a
 development build too (Expo Go uses the passcode); and someone technical could register a script
-instead of a phone the first time. The strongest option is still an office fingerprint machine.
+instead of a phone, which is why HR approves each one. The strongest option is still an office
+fingerprint machine.
 
 ### For the HR app: attendance corrections
 
@@ -143,6 +150,8 @@ record said before the change.
 `PATCH /api/attendance-corrections/:id` with `{ "status": "APPROVED" | "REJECTED", "note": "optional" }`
 decides a waiting request and returns `{ correction }`. Approving writes the requested times
 into the attendance record; rejecting changes nothing. A request can only be decided once (409).
+Approving is refused (409) if, since the request, the employee stopped being active or the day
+became approved leave without a check-in; rejecting is always possible.
 
 The HR app shows these under **Attendance → Requests from managers**.
 
@@ -156,11 +165,23 @@ The HR app shows these under **Attendance → Requests from managers**.
 | `GET /api/leave-requests?status=` | every employee's leave, with `managerName` and `decidedBy` |
 | `PATCH /api/leave-requests/:id` | `{ status, note? }` decides any pending request (409 once decided); `decidedBy` then reads "Name (HR)" |
 
-HR can't write a weekend, a day before the hire date, a day of approved leave or a future day, and
-today's times can't be later than now. Every HR change is saved as an already-approved correction
+HR can't write a day before the hire date, a day of approved leave without a check-in, or a future
+day, and today's times can't be later than now; weekends are fine. Every HR change is saved as an already-approved correction
 (`source: "HR"`) with who made it, when, the times before and the note ("Changed by HR" or "Check-in
 removed by HR" without one), so managers and employees see "Corrected by HR". These history rows
 aren't requests, so they don't appear in the correction lists.
+
+## Leave balance
+
+Everyone gets the same working days of leave per calendar year, set in `.env`:
+`LEAVE_ANNUAL_DAYS` (default 14), `LEAVE_SICK_DAYS` (8) and `LEAVE_CASUAL_DAYS` (6). A request counts
+towards the year its first day falls in, only Monday to Friday days are counted, and it is refused
+with a 409 if it needs more days than are left of that kind. Approved days are used up and days
+waiting for a decision are held back, so asking twice can't get past the limit; rejected and
+cancelled requests give their days back. `GET /api/me/leave-balance?year=` shows the numbers.
+Nothing carries over to the next year. The leave lists managers and HR admins decide from carry a
+`balance` on every pending request (what is left of that kind in the year it starts in, with the
+request's own days already held back), and `balance: null` on decided ones.
 
 ## Tests
 
