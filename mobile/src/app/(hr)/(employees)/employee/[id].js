@@ -99,7 +99,7 @@ export default function EmployeeScreen() {
         <ConfirmModal
           visible={confirmingDelete}
           title="Delete employee?"
-          message={`${fullName(employee)} will be removed for good, together with their leave requests. This can't be undone.`}
+          message={`${fullName(employee)} will be removed for good, together with their leave requests and attendance. Their past attendance changes stay on record. This can't be undone.`}
           confirmLabel="Delete"
           danger
           submitting={deleting}

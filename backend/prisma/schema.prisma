@@ -83,10 +83,14 @@ model Attendance {
 
 // A change to a day's times: a manager's request that only an HR admin can approve, or a change
 // an HR admin made directly (saved already approved, with no requester), so every change is traced.
+// It is history, so it stays when the employee is deleted (the link becomes null).
 model AttendanceCorrection {
   id               Int       @id @default(autoincrement())
-  employeeId       Int
-  employee         Employee  @relation("CorrectionFor", fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId       Int?
+  employee         Employee? @relation("CorrectionFor", fields: [employeeId], references: [id], onDelete: SetNull)
+  // Who it was for (employee ID and name), kept with the row so the history still says so
+  employeeCode     String?
+  employeeName     String?
   date             DateTime  @db.Date
   // The times that are right. No check-in means HR removed the day's check-in.
   checkIn          DateTime?

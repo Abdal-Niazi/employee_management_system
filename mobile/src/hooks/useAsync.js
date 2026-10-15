@@ -46,11 +46,24 @@ export function useAsync(loader) {
     }, [run])
   );
 
+  // Shows data the screen already has (e.g. what an action answered) without fetching again. A load
+  // still in flight is dropped, so it can't put older data back.
+  const replace = useCallback(
+    (data) => {
+      requestId.current += 1;
+      shownLoader.current = loader;
+      setState({ status: "success", data, error: null });
+      setRefreshing(false);
+    },
+    [loader]
+  );
+
   return {
     ...state,
     refreshing,
     reload: () => run("reload"),
     refresh: () => run("refresh"),
     revalidate: () => run(),
+    replace,
   };
 }

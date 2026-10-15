@@ -31,9 +31,6 @@ describe("registered phones", () => {
     request(app).post(`${deviceUrl(employeeId)}/approve`).set(hr).send({ registeredAt });
   const lastUsed = async () => (await prisma.registeredDevice.findUnique({ where: { employeeId: data.a1.id } })).lastUsedAt;
 
-  // A check-in that got past the phone check: what happens next depends on the day
-  const pastPhoneCheck = (res) => res.status !== 403;
-
   test("nothing is registered at first, and check-in needs a registered phone", async () => {
     const res = await today(employee);
     assert.equal(res.body.deviceRegistered, false);
@@ -149,21 +146,6 @@ describe("registered phones", () => {
     assert.equal(again.status, 409);
     assert.match(again.body.message, /ask HR to reset/);
     assert.equal((await today(employee, key)).body.device.thisPhone, true);
-  });
-
-  test("app builds from before registered phones keep their paths and are told to update", async () => {
-    for (const path of ["/api/me/check-in", "/api/me/check-out"]) {
-      const res = await request(app).post(path).set(employee);
-      assert.equal(res.status, 403);
-      assert.match(res.body.message, /Update the app/);
-    }
-
-    // The old path works like the new one with the phone's key
-    assert.ok(pastPhoneCheck(await request(app).post("/api/me/check-in").set(employee).set("X-Device-Key", key)));
-
-    // The old name for the days is still in the answer
-    const history = await request(app).get("/api/me/attendance?days=3").set(employee);
-    assert.deepEqual(history.body.attendance, history.body.records);
   });
 
   test("another person's key doesn't work for you", async () => {

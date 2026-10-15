@@ -43,10 +43,14 @@ const updateEmployee = async (id, employeeData) => {
   return employee;
 };
 
+// Their leave, attendance and phone go with them. Attendance changes are history and stay (with
+// the person's name and ID saved on each one); only requests still waiting for HR are removed,
+// since nobody can decide them any more.
 const deleteEmployee = async (id) => {
-  const employee = await prisma.employee.delete({
-    where: { id },
-  });
+  const [, employee] = await prisma.$transaction([
+    prisma.attendanceCorrection.deleteMany({ where: { employeeId: id, status: "PENDING" } }),
+    prisma.employee.delete({ where: { id } }),
+  ]);
 
   return employee;
 };

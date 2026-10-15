@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { prisma, seedFixtures } = require("./helpers");
 const { addDays, asDbDate, isWeekend, todayKey } = require("../src/utils/companyTime");
 const attendanceService = require("../src/services/attendanceService");
+const employeeService = require("../src/services/employeeService");
 
 // A work day inside the correction window, so the requests are allowed by the calendar.
 const day = [1, 2, 3, 4, 5, 6].map((i) => addDays(todayKey(), -i)).find((d) => !isWeekend(d));
@@ -108,5 +109,31 @@ describe("correction requests", () => {
 
     const [listed] = await attendanceService.listAllCorrections("PENDING");
     assert.deepEqual(listed.before, { checkIn: "10:00", checkOut: null });
+  });
+});
+
+// Last, because it deletes an employee from the fixtures.
+describe("deleting an employee", () => {
+  test("keeps their attendance change history, with their name and ID, and drops waiting requests", async () => {
+    await attendanceService.recordDay(hrId, { employeeId: data.a2.id, date: day, checkIn: "09:10", note: "Machine was down" });
+    await attendanceService.requestCorrection(data.managerA.id, {
+      employeeId: data.a2.id,
+      date: day,
+      checkIn: "09:00",
+      reason: "Came in at nine",
+    });
+
+    await employeeService.deleteEmployee(data.a2.id);
+
+    const left = await prisma.attendanceCorrection.findMany({ where: { employeeCode: "A-2" } });
+    assert.equal(left.length, 1);
+    assert.equal(left[0].source, "HR");
+    assert.equal(left[0].reason, "Machine was down");
+    assert.equal(left[0].employeeId, null);
+    assert.equal(left[0].employeeName, "Ayesha Test");
+
+    // Their attendance went with them, and HR's request list has nothing to act on for them
+    assert.equal(await prisma.attendance.count({ where: { employeeId: data.a2.id } }), 0);
+    assert.deepEqual(await attendanceService.listAllCorrections(), []);
   });
 });

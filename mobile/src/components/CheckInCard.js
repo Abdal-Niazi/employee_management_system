@@ -45,25 +45,31 @@ export default function CheckInCard({ title = "Your attendance today" }) {
     return { ...day, deviceKey };
   }, [accountId]);
 
-  const { status, data, error, reload, revalidate } = useAsync(load);
+  const { status, data, error, reload, revalidate, replace } = useAsync(load);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [actionError, setActionError] = useState(null);
 
-  // After an action (or a refusal, e.g. already checked in on another phone) reload the day,
-  // so the card always shows what the server has. Cancelling the fingerprint prompt says nothing.
+  // An action returns the card's new state from the server's answer, so nothing is fetched again.
+  // After a refusal (e.g. already checked in on another phone) the day is reloaded, so the card
+  // shows what the server has. Cancelling the fingerprint prompt says nothing.
   const act = async (action) => {
     setBusy(true);
     setActionError(null);
     try {
-      await action();
+      replace(await action());
       setConfirming(false);
     } catch (e) {
-      if (!e.cancelled) setActionError(e.message);
+      if (!e.cancelled) {
+        setActionError(e.message);
+        await revalidate();
+      }
     }
-    await revalidate();
     setBusy(false);
   };
+
+  // The day check-in or check-out answered, with this phone's state, which they don't change.
+  const withDay = (day) => ({ ...data, ...day, device: data.device, deviceKey: data.deviceKey });
 
   const registerThisPhone = () =>
     act(async () => {
@@ -71,19 +77,20 @@ export default function CheckInCard({ title = "Your attendance today" }) {
       // Saved before it is sent: if the answer gets lost, a retry sends the same key.
       const key = data.deviceKey ?? makeDeviceKey();
       await saveDeviceKey(accountId, key);
-      await registerDevice(Platform.OS, key);
+      const device = await registerDevice(Platform.OS, key);
+      return { ...data, device: { status: device.status, platform: device.platform, thisPhone: true }, deviceKey: key };
     });
 
   const doCheckIn = () =>
     act(async () => {
       await confirmIdentity("Confirm it's you to check in");
-      await checkIn(data.deviceKey);
+      return withDay(await checkIn(data.deviceKey));
     });
 
   const doCheckOut = () =>
     act(async () => {
       await confirmIdentity("Confirm it's you to check out");
-      await checkOut(data.deviceKey);
+      return withDay(await checkOut(data.deviceKey));
     });
 
   if (status === "loading") {

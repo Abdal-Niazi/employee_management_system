@@ -21,6 +21,9 @@ const time = (instant) => (instant ? toCompanyTime(instant) : null);
 const times = (checkIn, checkOut) => ({ checkIn: time(checkIn), checkOut: time(checkOut) });
 const fullName = (person) => (person ? `${person.firstName} ${person.lastName}`.trim() : null);
 
+// Who a correction is for, saved with it so the history still says so if the employee is deleted.
+const whoFor = (employee) => ({ employeeId: employee.id, employeeCode: employee.employeeId, employeeName: fullName(employee) });
+
 // The first day a manager can still ask HR to correct.
 const windowStart = (now) => addDays(todayKey(now), -(CORRECTION_WINDOW_DAYS - 1));
 
@@ -100,15 +103,25 @@ const dayFor = async ({ loadPeople, scope, view }, dateKey, now) => {
     }),
   ]);
 
+  // Looked up by person, so a day costs one pass over each list, not one per person.
+  const rowBy = new Map(rows.map((r) => [r.employeeId, r]));
+  const onLeave = new Set(leave.map((l) => l.employeeId));
+  const correctionsBy = new Map();
+  for (const c of corrections) {
+    // Still newest first, as they were read
+    if (!correctionsBy.has(c.employeeId)) correctionsBy.set(c.employeeId, []);
+    correctionsBy.get(c.employeeId).push(c);
+  }
+
   const results = people.map((employee) => ({
     employee: toEmployeeDto(employee),
     record: view(
       toRecord({
         employee,
         dateKey,
-        row: rows.find((r) => r.employeeId === employee.id) ?? null,
-        onLeave: leave.some((l) => l.employeeId === employee.id),
-        corrections: corrections.filter((c) => c.employeeId === employee.id),
+        row: rowBy.get(employee.id) ?? null,
+        onLeave: onLeave.has(employee.id),
+        corrections: correctionsBy.get(employee.id) ?? [],
         now,
       })
     ),
@@ -322,10 +335,10 @@ const findEmployee = async (id) => {
 
 // The change HR made, saved like an approved correction (with the times before it) so it can be
 // traced, and shown as "Corrected by HR" like one. `fixed` null means the check-in was removed.
-const saveHrChange = (tx, adminId, { employeeId, date, current, fixed, note }) =>
+const saveHrChange = (tx, adminId, { employee, date, current, fixed, note }) =>
   tx.attendanceCorrection.create({
     data: {
-      employeeId,
+      ...whoFor(employee),
       date,
       checkIn: fixed?.checkIn ?? null,
       checkOut: fixed?.checkOut ?? null,
@@ -369,7 +382,7 @@ const recordDay = async (adminId, { employeeId, date: dateKey, checkIn, checkOut
     // after the person checked in): then HR can still fix it.
     if (!current) await refuseLeaveDay(tx, employeeId, date);
 
-    await saveHrChange(tx, adminId, { employeeId, date, current, fixed, note });
+    await saveHrChange(tx, adminId, { employee, date, current, fixed, note });
     await tx.attendance.upsert({ where: day, create: { employeeId, date, ...fixed }, update: fixed });
   });
 
@@ -386,7 +399,7 @@ const clearDay = async (adminId, { employeeId, date: dateKey, note }, now = new 
     const current = await tx.attendance.findUnique({ where: day });
     if (!current) throw new AppError("No check-in is recorded for that day", 404);
 
-    await saveHrChange(tx, adminId, { employeeId, date, current, fixed: null, note });
+    await saveHrChange(tx, adminId, { employee, date, current, fixed: null, note });
     await tx.attendance.delete({ where: day });
   });
 
@@ -416,10 +429,11 @@ const toCorrectionDto = (row, current) => {
 
   return {
     id: row.id,
-    employeeId: row.employee.employeeId,
-    employeeDbId: row.employee.id,
-    employeeName: fullName(row.employee),
-    department: row.employee.department,
+    // From the saved copy when the employee has been deleted since
+    employeeId: row.employee?.employeeId ?? row.employeeCode,
+    employeeDbId: row.employee?.id ?? null,
+    employeeName: row.employee ? fullName(row.employee) : row.employeeName,
+    department: row.employee?.department ?? null,
     date: toDateKey(row.date),
     requested: times(row.checkIn, row.checkOut),
     before,
@@ -465,8 +479,9 @@ const listCorrections = async (where) => {
 const listTeamCorrections = (managerId, status) =>
   listCorrections({ ...REQUESTS, employee: { managerId }, ...(status && { status }) });
 
-// HR's view: every request.
-const listAllCorrections = (status) => listCorrections({ ...REQUESTS, ...(status && { status }) });
+// HR's view: every request about someone who is still an employee. Those of deleted employees stay
+// in the table as history but aren't anything to act on.
+const listAllCorrections = (status) => listCorrections({ ...REQUESTS, employeeId: { not: null }, ...(status && { status }) });
 
 const getCorrection = async (id) => {
   const row = await prisma.attendanceCorrection.findUnique({ where: { id }, include: correctionInclude });
@@ -515,7 +530,7 @@ const requestCorrection = async (managerId, { employeeId, date: dateKey, checkIn
 
     return tx.attendanceCorrection.create({
       data: {
-        employeeId,
+        ...whoFor(employee),
         date,
         checkIn: fromCompanyTime(dateKey, checkIn),
         checkOut: checkOut ? fromCompanyTime(dateKey, checkOut) : null,
