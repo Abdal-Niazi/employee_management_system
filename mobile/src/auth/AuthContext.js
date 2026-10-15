@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getCurrentAdmin, loginRequest } from "../api/auth";
+import { changePasswordRequest, getCurrentAdmin, loginRequest } from "../api/auth";
 import { ApiError, setAuthToken, setUnauthorizedHandler } from "../api/client";
 import { clearToken, loadToken, saveToken } from "./tokenStorage";
 
@@ -70,8 +70,19 @@ export function AuthProvider({ children }) {
     setUser(toUser(admin));
   };
 
+  // The server signs out every other login and answers with a new token for this one, which
+  // replaces the old token here (in memory and in secure storage).
+  const changePassword = async (currentPassword, newPassword) => {
+    const { token, admin } = await changePasswordRequest(currentPassword, newPassword);
+    setAuthToken(token);
+    await saveToken(token).catch(() => {});
+    setUser(toUser(admin));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, restoring, unreachable, retry, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, restoring, unreachable, retry, login, logout, changePassword }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
