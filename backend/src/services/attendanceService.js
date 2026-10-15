@@ -46,6 +46,9 @@ const toRecord = ({ employee, dateKey, row, onLeave, corrections, now }) => {
   const hireDateKey = toDateKey(employee.hireDate);
   const status = attendanceStatus({ dateKey, hireDateKey, onLeave, record: row, active, now });
   const correction = pickCorrection(corrections);
+  // A day that can be changed: from the hire date on, and not a day of approved leave unless a
+  // check-in was saved anyway (for example the leave was approved afterwards). Weekends count.
+  const open = dateKey >= hireDateKey && (!onLeave || Boolean(row));
 
   return {
     date: dateKey,
@@ -54,11 +57,9 @@ const toRecord = ({ employee, dateKey, row, onLeave, corrections, now }) => {
     correction: correction && { id: correction.id, status: correction.status },
     // Whether the manager may ask HR to fix this day now (never for someone who isn't active)
     correctable:
-      active &&
-      !["OFF", "ON_LEAVE"].includes(status) &&
-      dateKey >= windowStart(now) &&
-      dateKey <= todayKey(now) &&
-      correction?.status !== "PENDING",
+      active && open && dateKey >= windowStart(now) && dateKey <= todayKey(now) && correction?.status !== "PENDING",
+    // Whether HR may write this day (HR also handles people who aren't active)
+    editable: open,
   };
 };
 
@@ -67,6 +68,14 @@ const countStatuses = (records) =>
 
 const approvedLeaveOn = (date) => ({ status: "APPROVED", startDate: { lte: date }, endDate: { gte: date } });
 const VISIBLE_CORRECTIONS = { status: { in: ["PENDING", "APPROVED"] } };
+
+// A day of approved leave can't be given a check-in (one saved before the leave was approved can
+// still be fixed, so callers only ask this when the day has none). `db` is a transaction.
+const refuseLeaveDay = async (db, employeeId, date) => {
+  if (await db.leaveRequest.findFirst({ where: { employeeId, ...approvedLeaveOn(date) } })) {
+    throw new AppError("This employee is on approved leave that day", 409);
+  }
+};
 
 // ---------- Viewing a day (managers and HR admins) ----------
 
@@ -119,10 +128,16 @@ const dayFor = async ({ loadPeople, scope, view }, dateKey, now) => {
 // Every team member's record for one day.
 const getTeamDay = (managerId, dateKey, now = new Date()) =>
   dayFor(
-    { loadPeople: () => managerService.getTeam(managerId), scope: { employee: { managerId } }, view: (r) => r },
+    { loadPeople: () => managerService.getTeam(managerId), scope: { employee: { managerId } }, view: managerRecord },
     dateKey,
     now
   );
+
+// The views of a record: a manager sees whether they may ask HR to correct it, HR whether it may
+// write it, and the person themselves neither.
+const managerRecord = ({ editable, ...record }) => record;
+const ownRecord = ({ correctable, editable, ...record }) => record;
+const hrRecord = ({ correctable, ...record }) => record;
 
 // One person's last `days` days, newest first. Used by the manager's member page and by
 // the person's own history.
@@ -164,19 +179,16 @@ const getMemberHistory = async (managerId, employeeId, days, now = new Date()) =
   if (!employee) return null;
 
   const { today, records } = await historyFor(employee, days, now);
-  return { employee: toEmployeeDto(employee), today, shift: SHIFT, records };
+  return { employee: toEmployeeDto(employee), today, shift: SHIFT, records: records.map(managerRecord) };
 };
 
 // ---------- An employee's own attendance (employees and managers) ----------
 
-// A person's own view of a day: `correctable` is left out, because only managers ask HR to correct.
-const ownRecord = ({ correctable, ...record }) => record;
 
 // Why `employee` can't check in on `dateKey`, or null if they can. The card shows the same
 // message, so the app and the API never disagree.
+// Weekends have no shift, but someone who works one checks in as usual.
 const checkInBlock = (employee, dateKey, onLeave) => {
-  if (isWeekend(dateKey)) return new AppError("There is no shift today", 400);
-
   const firstDay = toDateKey(employee.hireDate);
   if (dateKey < firstDay) return new AppError(`You can check in from your first day, ${firstDay}`, 400);
 
@@ -271,12 +283,6 @@ const getMyHistory = async (employee, days, now = new Date()) => {
 const HR_REASON = "Changed by HR";
 const HR_REMOVED_REASON = "Check-in removed by HR";
 
-// HR's view of a record: whether HR can write this day (`correctable` is for managers). Weekends,
-// days before the hire date and approved leave always show as off or on leave, so they can't be.
-const hrRecord = ({ correctable, ...record }) => ({
-  ...record,
-  editable: !["OFF", "ON_LEAVE"].includes(record.status),
-});
 
 // Everyone's record for one day, except people who left (status "terminated").
 const getAllDay = (dateKey, now = new Date()) =>
@@ -341,9 +347,6 @@ const recordDay = async (adminId, { employeeId, date: dateKey, checkIn, checkOut
   if (dateKey > todayKey(now)) {
     throw new AppError("Attendance can't be recorded for a day that hasn't happened yet", 400);
   }
-  if (isWeekend(dateKey)) {
-    throw new AppError("There is no shift on weekends", 400);
-  }
   if (dateKey < toDateKey(employee.hireDate)) {
     throw new AppError("This day is before the employee was hired", 400);
   }
@@ -352,10 +355,6 @@ const recordDay = async (adminId, { employeeId, date: dateKey, checkIn, checkOut
   }
 
   const date = asDbDate(dateKey);
-  if (await findApprovedLeave(employee, date)) {
-    throw new AppError("This employee is on approved leave that day", 409);
-  }
-
   const fixed = {
     checkIn: fromCompanyTime(dateKey, checkIn),
     checkOut: checkOut ? fromCompanyTime(dateKey, checkOut) : null,
@@ -365,6 +364,10 @@ const recordDay = async (adminId, { employeeId, date: dateKey, checkIn, checkOut
   await serializable(async (tx) => {
     const day = { employeeId_date: { employeeId, date } };
     const current = await tx.attendance.findUnique({ where: day });
+
+    // A day of approved leave stays off, unless a check-in was saved anyway (leave approved
+    // after the person checked in): then HR can still fix it.
+    if (!current) await refuseLeaveDay(tx, employeeId, date);
 
     await saveHrChange(tx, adminId, { employeeId, date, current, fixed, note });
     await tx.attendance.upsert({ where: day, create: { employeeId, date, ...fixed }, update: fixed });
@@ -443,9 +446,14 @@ const listCorrections = async (where) => {
   const rows = await prisma.attendanceCorrection.findMany({ where, include: correctionInclude });
   if (rows.length === 0) return [];
 
-  // The current record of each requested day, to show what would change.
+  // The current record of each requested day, to show what would change: one query by the
+  // people and days involved (matched up below), not one condition per request.
+  const unique = (values) => [...new Set(values)];
   const current = await prisma.attendance.findMany({
-    where: { OR: rows.map(({ employeeId, date }) => ({ employeeId, date })) },
+    where: {
+      employeeId: { in: unique(rows.map((r) => r.employeeId)) },
+      date: { in: unique(rows.map((r) => r.date.getTime())).map((t) => new Date(t)) },
+    },
   });
   const currentFor = (row) =>
     current.find((r) => r.employeeId === row.employeeId && r.date.getTime() === row.date.getTime()) ?? null;
@@ -485,9 +493,6 @@ const requestCorrection = async (managerId, { employeeId, date: dateKey, checkIn
   if (dateKey < windowStart(now)) {
     throw new AppError(`Corrections can only be requested for the last ${CORRECTION_WINDOW_DAYS} days`, 400);
   }
-  if (isWeekend(dateKey)) {
-    throw new AppError("There is no shift on weekends", 400);
-  }
   if (dateKey < toDateKey(employee.hireDate)) {
     throw new AppError("This day is before the employee was hired", 400);
   }
@@ -497,34 +502,36 @@ const requestCorrection = async (managerId, { employeeId, date: dateKey, checkIn
 
   const date = asDbDate(dateKey);
 
-  const onLeave = await prisma.leaveRequest.findFirst({ where: { employeeId, ...approvedLeaveOn(date) } });
-  if (onLeave) {
-    throw new AppError("This employee is on approved leave that day", 409);
-  }
+  // Checked and created in one Serializable transaction, so two requests sent at once can't
+  // both pass the "already waiting" check.
+  const created = await serializable(async (tx) => {
+    const current = await tx.attendance.findUnique({ where: { employeeId_date: { employeeId, date } } });
+    if (!current) await refuseLeaveDay(tx, employeeId, date);
 
-  // The app disables its button while sending, so a double request is unlikely; HR would see both.
-  const waiting = await prisma.attendanceCorrection.findFirst({ where: { employeeId, date, status: "PENDING" } });
-  if (waiting) {
-    throw new AppError("A correction for this day is already waiting for HR", 409);
-  }
+    const waiting = await tx.attendanceCorrection.findFirst({ where: { employeeId, date, status: "PENDING" } });
+    if (waiting) {
+      throw new AppError("A correction for this day is already waiting for HR", 409);
+    }
 
-  const created = await prisma.attendanceCorrection.create({
-    data: {
-      employeeId,
-      date,
-      checkIn: fromCompanyTime(dateKey, checkIn),
-      checkOut: checkOut ? fromCompanyTime(dateKey, checkOut) : null,
-      reason,
-      requestedById: managerId,
-    },
+    return tx.attendanceCorrection.create({
+      data: {
+        employeeId,
+        date,
+        checkIn: fromCompanyTime(dateKey, checkIn),
+        checkOut: checkOut ? fromCompanyTime(dateKey, checkOut) : null,
+        reason,
+        requestedById: managerId,
+      },
+    });
   });
 
   return getCorrection(created.id);
 };
 
-// An HR admin approves or rejects a request. Only approving changes the attendance record.
+// An HR admin approves or rejects a request. Only approving changes the attendance record, and
+// only if the day can still be changed: things may have moved on since the manager asked.
 const decideCorrection = async (adminId, id, { status, note }) => {
-  await prisma.$transaction(async (tx) => {
+  await serializable(async (tx) => {
     // Only a still-pending request changes, checked in the same statement as the update,
     // so two decisions can't both win.
     const { count } = await tx.attendanceCorrection.updateMany({
@@ -543,6 +550,12 @@ const decideCorrection = async (adminId, id, { status, note }) => {
     const correction = await tx.attendanceCorrection.findUnique({ where: { id } });
     const day = { employeeId_date: { employeeId: correction.employeeId, date: correction.date } };
     const current = await tx.attendance.findUnique({ where: day });
+
+    const employee = await tx.employee.findUnique({ where: { id: correction.employeeId }, select: { status: true } });
+    if (employee.status !== "active") {
+      throw new AppError("This employee isn't active any more. Reject the request, or change the day directly.", 409);
+    }
+    if (!current) await refuseLeaveDay(tx, correction.employeeId, correction.date);
 
     // Keep what the record said, so the change can be traced later.
     await tx.attendanceCorrection.update({

@@ -76,7 +76,7 @@ export default function HrAttendanceScreen() {
       <FlatList
         style={styles.flex}
         contentContainerStyle={styles.content}
-        data={data.workday ? data.rows : []}
+        data={data.rows}
         keyExtractor={(row) => String(row.employee.id)}
         refreshing={refreshing}
         onRefresh={refresh}
@@ -88,25 +88,24 @@ export default function HrAttendanceScreen() {
                 <Text style={styles.toastText}>{toast}</Text>
               </View>
             )}
-            {data.workday && <AttendanceSummary counts={data.counts} />}
+            <AttendanceSummary counts={data.counts} />
+            {!data.workday && (
+              <Text style={font.small}>Weekend: no shift is scheduled. Anyone who worked that day shows as present.</Text>
+            )}
             <LinkRow
               icon="document-text-outline"
               label="Requests from managers"
               count={data.waiting}
               onPress={() => router.push("/attendance-requests")}
             />
-            {data.workday && data.rows.length > 0 && (
+            {data.rows.length > 0 && (
               <Text style={font.small}>Tap a person to write, fix or remove their check-in.</Text>
             )}
           </View>
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          data.workday ? (
-            <EmptyState icon="people-outline" title="No employees yet" message="Add employees on the Employees tab." />
-          ) : (
-            <EmptyState icon="cafe-outline" title="Weekend" message="No shift is scheduled on this day." />
-          )
+          <EmptyState icon="people-outline" title="No employees yet" message="Add employees on the Employees tab." />
         }
         renderItem={({ item }) => (
           <Pressable

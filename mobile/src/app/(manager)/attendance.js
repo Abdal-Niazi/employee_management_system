@@ -65,7 +65,7 @@ export default function AttendanceScreen() {
       <FlatList
         style={styles.flex}
         contentContainerStyle={styles.content}
-        data={data.workday ? data.rows : []}
+        data={data.rows}
         keyExtractor={(row) => String(row.employee.id)}
         refreshing={refreshing}
         onRefresh={refresh}
@@ -77,24 +77,23 @@ export default function AttendanceScreen() {
                 <Text style={styles.toastText}>{toast}</Text>
               </View>
             )}
-            {data.workday && <AttendanceSummary counts={data.counts} />}
+            <AttendanceSummary counts={data.counts} />
+            {!data.workday && (
+              <Text style={font.small}>Weekend: no shift is scheduled. Anyone who worked that day shows as present.</Text>
+            )}
             <LinkRow
               icon="document-text-outline"
               label="My correction requests"
               onPress={() => router.push("/corrections")}
             />
-            {data.workday && canCorrect && (
+            {canCorrect && (
               <Text style={font.small}>Wrong time? Tap a person to ask HR for a correction.</Text>
             )}
           </View>
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          data.workday ? (
-            <EmptyState icon="people-outline" title="No team members yet" />
-          ) : (
-            <EmptyState icon="cafe-outline" title="Weekend" message="No shift is scheduled on this day." />
-          )
+          <EmptyState icon="people-outline" title="No team members yet" />
         }
         renderItem={({ item }) => (
           <Pressable

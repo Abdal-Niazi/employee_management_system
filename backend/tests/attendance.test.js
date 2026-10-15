@@ -51,8 +51,13 @@ describe("status rules", () => {
     assert.equal(attendanceStatus({ ...base, hireDateKey: "2026-03-11" }), "OFF");
   });
 
-  test("approved leave wins over everything else on a work day", () => {
-    assert.equal(attendanceStatus({ ...base, onLeave: true, record: { checkIn: at(TUESDAY, "09:00") } }), "ON_LEAVE");
+  test("someone who works a weekend is present, never late (there is no shift)", () => {
+    assert.equal(attendanceStatus({ ...base, dateKey: SATURDAY, record: { checkIn: at(SATURDAY, "11:30") } }), "PRESENT");
+  });
+
+  test("a saved check-in shows even on approved leave; without one, leave wins", () => {
+    assert.equal(attendanceStatus({ ...base, onLeave: true, record: { checkIn: at(TUESDAY, "09:20") } }), "LATE");
+    assert.equal(attendanceStatus({ ...base, onLeave: true }), "ON_LEAVE");
   });
 
   test("late means more than 5 minutes after 09:00", () => {
@@ -251,13 +256,16 @@ describe("attendance API", () => {
       assert.equal(res.status, 404);
     });
 
-    test("only work days in the last 7 days, not on leave", async () => {
+    test("only the last 7 days (weekends too), not on leave", async () => {
       const tooOld = await requestCorrection(managerA, correction({ date: addDays(today, -7) }));
       assert.equal(tooOld.status, 400);
       assert.match(tooOld.body.message, /last 7 days/);
 
       assert.equal((await requestCorrection(managerA, correction({ date: addDays(today, 1) }))).status, 400);
-      assert.equal((await requestCorrection(managerA, correction({ date: weekendDay }))).status, 400);
+      // Someone who worked a weekend day can have it fixed too
+      const weekend = await requestCorrection(managerA, correction({ date: weekendDay }));
+      assert.equal(weekend.status, 201);
+      await prisma.attendanceCorrection.delete({ where: { id: weekend.body.correction.id } });
 
       // Times later than now, checked with a fixed clock (noon) so this passes at any hour.
       const later = { employeeId: data.a1.id, date: workday, checkIn: "13:00", checkOut: "14:00", reason: "Typo" };

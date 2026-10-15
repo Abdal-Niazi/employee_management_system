@@ -146,14 +146,28 @@ describe("HR admin: writing attendance directly", () => {
     }
   });
 
-  test("weekends and approved leave can't be written", async () => {
+  test("a weekend day can be written; a day of approved leave only if it has a check-in", async () => {
     const day = await request(app).get(`/api/attendance?date=${WEDNESDAY}`).set(hr);
     assert.equal(day.body.rows.find((r) => r.employee.employeeId === "A-2").record.editable, false);
-
-    const weekend = await put({ employeeId: data.a1.id, date: SATURDAY, checkIn: "09:00" });
-    assert.equal(weekend.status, 400);
     const onLeave = await put({ employeeId: data.a2.id, date: WEDNESDAY, checkIn: "09:00" });
     assert.equal(onLeave.status, 409);
+
+    const saturday = await request(app).get(`/api/attendance?date=${SATURDAY}`).set(hr);
+    assert.ok(saturday.body.rows.every((r) => r.record.status === "OFF" && r.record.editable));
+    const weekend = await put({ employeeId: data.a1.id, date: SATURDAY, checkIn: "11:30", checkOut: "14:00" });
+    assert.equal(weekend.status, 200);
+    assert.equal(weekend.body.record.status, "PRESENT");
+    assert.equal((await request(app).delete(`/api/attendance/${data.a1.id}/${SATURDAY}`).set(hr)).status, 200);
+
+    // Leave approved after the person had checked in: the check-in shows and HR can still fix it
+    await prisma.attendance.create({ data: { employeeId: data.a2.id, date: asDbDate(WEDNESDAY), checkIn: fromCompanyTime(WEDNESDAY, "09:40") } });
+    const withCheckIn = (await request(app).get(`/api/attendance?date=${WEDNESDAY}`).set(hr)).body.rows.find(
+      (r) => r.employee.employeeId === "A-2"
+    ).record;
+    assert.equal(withCheckIn.status, "LATE");
+    assert.equal(withCheckIn.editable, true);
+    assert.equal((await put({ employeeId: data.a2.id, date: WEDNESDAY, checkIn: "09:00" })).status, 200);
+    await prisma.attendance.deleteMany({ where: { employeeId: data.a2.id, date: asDbDate(WEDNESDAY) } });
   });
 
   test("won't write the future, a day before the hire date, or an unknown employee", async () => {

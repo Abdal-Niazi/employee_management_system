@@ -95,12 +95,18 @@ describe("checking in and out (fixed clock)", () => {
     assert.deepEqual(checkOuts.map((r) => r.status).sort(), ["fulfilled", "rejected"]);
   });
 
-  test("no check-in on a weekend, before the first day, when not active, or on leave", async () => {
+  test("someone who works a weekend checks in as usual, and is never late there", async () => {
     const weekend = await attendanceService.getMyDay(data.a1, at(SATURDAY, "10:00"));
     assert.equal(weekend.workday, false);
-    assert.equal(weekend.canCheckIn, false);
-    assert.match(weekend.notice, /no shift/);
-    await assert.rejects(attendanceService.checkIn(data.a1, at(SATURDAY, "10:00")), { statusCode: 400 });
+    assert.equal(weekend.canCheckIn, true);
+    assert.equal(weekend.notice, null);
+
+    const day = await attendanceService.checkIn(data.a1, at(SATURDAY, "11:30"));
+    assert.equal(day.record.status, "PRESENT");
+    await prisma.attendance.deleteMany({ where: { employeeId: data.a1.id, date: asDbDate(SATURDAY) } });
+  });
+
+  test("no check-in before the first day, when not active, or on leave", async () => {
 
     // Hired on Monday 15 January 2024; the Friday before is a work day but too early.
     await assert.rejects(attendanceService.checkIn(data.a1, at("2024-01-12", "09:00")), {
@@ -154,19 +160,14 @@ describe("the /api/me API (real clock)", () => {
     assert.equal(res.body.today, today);
     assert.equal(res.body.workday, workday);
     assert.equal(res.body.shift.start, "09:00");
-    assert.equal(res.body.canCheckIn, workday);
+    // Weekends have no shift, but check-in is open every day
+    assert.equal(res.body.canCheckIn, true);
     assert.equal(res.body.canCheckOut, false);
     assert.equal(res.body.deviceRegistered, true);
   });
 
-  // The answer depends on whether today is a work day, so the suite passes on any day.
   test("checking in and out through the API", async () => {
     const res = await request(app).post("/api/me/attendance/check-in").set(employee);
-
-    if (!workday) {
-      assert.equal(res.status, 400);
-      return;
-    }
 
     assert.equal(res.status, 200);
     assert.equal(res.body.canCheckOut, true);
@@ -179,11 +180,6 @@ describe("the /api/me API (real clock)", () => {
 
   test("a manager checks in for themselves", async () => {
     const res = await request(app).post("/api/me/attendance/check-in").set(manager);
-
-    if (!workday) {
-      assert.equal(res.status, 400);
-      return;
-    }
 
     assert.equal(res.status, 200);
     const row = await prisma.attendance.findUnique({

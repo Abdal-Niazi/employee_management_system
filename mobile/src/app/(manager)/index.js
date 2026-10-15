@@ -63,7 +63,7 @@ export default function OverviewScreen() {
         <Stat
           icon="checkmark-circle-outline"
           label="Checked in today"
-          value={workday ? `${checkedIn}/${expected}` : "—"}
+          value={workday ? `${checkedIn}/${expected}` : String(checkedIn)}
           onPress={() => router.navigate("/attendance")}
         />
         <Stat
@@ -77,7 +77,10 @@ export default function OverviewScreen() {
 
       <Card title="Today's attendance">
         {!workday ? (
-          <Text style={font.small}>No shift scheduled today.</Text>
+          <Text style={font.small}>
+            No shift scheduled today.
+            {checkedIn > 0 ? ` ${checkedIn} of your team worked anyway.` : ""}
+          </Text>
         ) : (
           <View style={styles.breakdown}>
             {BREAKDOWN.map((key) => (

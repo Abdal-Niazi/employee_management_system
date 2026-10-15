@@ -29,14 +29,19 @@ const STATUSES = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "NOT_IN", "OFF", "INA
 
 // The status of one person's day. `record` is their Attendance row for that day, or null.
 // `active` is false for an employee whose status isn't "active" (they left, or are on hold).
+// A saved check-in always shows, even on a weekend or a day of leave approved afterwards. On a
+// weekend there is no shift, so a check-in there is never late.
 const attendanceStatus = ({ dateKey, hireDateKey, onLeave, record, active = true, now = new Date() }) => {
-  if (isWeekend(dateKey) || dateKey < hireDateKey) return "OFF";
-  if (onLeave) return "ON_LEAVE";
+  if (dateKey < hireDateKey) return "OFF";
 
   if (record) {
-    const late = toMinutes(toCompanyTime(record.checkIn)) > toMinutes(SHIFT.start) + SHIFT.graceMinutes;
+    const late =
+      !isWeekend(dateKey) && toMinutes(toCompanyTime(record.checkIn)) > toMinutes(SHIFT.start) + SHIFT.graceMinutes;
     return late ? "LATE" : "PRESENT";
   }
+
+  if (isWeekend(dateKey)) return "OFF";
+  if (onLeave) return "ON_LEAVE";
 
   // Not expected at work, so never counted as absent. (There is no leaving date, so this
   // applies to every day without a check-in.)
