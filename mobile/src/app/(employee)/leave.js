@@ -12,8 +12,8 @@ import { colors, spacing } from "../../theme";
 
 // The requests and this year's balance, which change together.
 async function loadLeave() {
-  const [requests, balance] = await Promise.all([getMyLeave(), getMyLeaveBalance()]);
-  return { requests, balance };
+  const [{ today, leaveRequests }, balance] = await Promise.all([getMyLeave(), getMyLeaveBalance()]);
+  return { today, requests: leaveRequests, balance };
 }
 
 export default function MyLeaveScreen() {
@@ -108,6 +108,7 @@ export default function MyLeaveScreen() {
       <LeaveRequestSheet
         visible={asking}
         balance={status === "success" ? data.balance : null}
+        today={data?.today}
         saving={saving}
         error={formError}
         onCancel={() => setAsking(false)}

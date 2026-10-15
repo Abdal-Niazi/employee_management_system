@@ -26,11 +26,18 @@ model Employee {
   reports   Employee[] @relation("ManagerReports")
 
   leaveRequests  LeaveRequest[] @relation("EmployeeLeave")
-  attendance     Attendance[]
   leaveDecisions LeaveRequest[] @relation("LeaveDecider")
 
-  // The login account of this employee, if they have one (managers do)
+  attendance         Attendance[]           @relation("EmployeeAttendance")
+  // Corrections asked for this employee's days, and the ones they asked for as a manager
+  corrections        AttendanceCorrection[] @relation("CorrectionFor")
+  correctionRequests AttendanceCorrection[] @relation("CorrectionRequester")
+
+  // The login account of this employee, if they have one (a MANAGER or EMPLOYEE account)
   account Admin? @relation("AdminEmployee")
+
+  // The one phone this employee checks in from, once registered
+  device RegisteredDevice? @relation("EmployeeDevice")
 
   @@index([managerId])
 }
@@ -59,21 +66,55 @@ model LeaveRequest {
   @@index([employeeId, status])
 }
 
-// One row per employee per day they checked in. A day with no row is derived at read
-// time (weekend, on leave, not in yet, or absent), so nothing has to be written for it.
+// One row per person per work day, created when they check in.
 model Attendance {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   employeeId Int
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date       DateTime @db.Date
-  // Local wall-clock times as "HH:MM" (24-hour), the same shape the mobile app shows
-  checkIn    String
-  checkOut   String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  employee   Employee  @relation("EmployeeAttendance", fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime  @db.Date // the work day
+  checkIn    DateTime // exact moment, stored in UTC
+  checkOut   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([employeeId, date])
   @@index([date])
+}
+
+// A change to a day's times: a manager's request that only an HR admin can approve, or a change
+// an HR admin made directly (saved already approved, with no requester), so every change is traced.
+// It is history, so it stays when the employee is deleted (the link becomes null).
+model AttendanceCorrection {
+  id               Int       @id @default(autoincrement())
+  employeeId       Int?
+  employee         Employee? @relation("CorrectionFor", fields: [employeeId], references: [id], onDelete: SetNull)
+  // Who it was for (employee ID and name), kept with the row so the history still says so
+  employeeCode     String?
+  employeeName     String?
+  date             DateTime  @db.Date
+  // The times that are right. No check-in means HR removed the day's check-in.
+  checkIn          DateTime?
+  checkOut         DateTime?
+  reason           String
+  status           String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  // MANAGER: a manager's request. HR: an HR admin changed the day directly.
+  source           String    @default("MANAGER")
+  // The manager (an employee) who asked
+  requestedById    Int?
+  requestedBy      Employee? @relation("CorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  // The HR admin account that approved or rejected it
+  decidedById      Int?
+  decidedBy        Admin?    @relation("CorrectionDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt        DateTime?
+  decisionNote     String?
+  // What the record said when HR approved it, so the change can be traced
+  previousCheckIn  DateTime?
+  previousCheckOut DateTime?
+  createdAt        DateTime  @default(now()) // when it was requested
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status])
+  @@index([employeeId, date])
 }
 
 enum Role {
@@ -82,17 +123,40 @@ enum Role {
   EMPLOYEE
 }
 
-// Staff accounts that can log in. Existing accounts are HR admins.
+// Accounts that can log in: HR admins, managers and employees.
 model Admin {
-  id           Int            @id @default(autoincrement())
-  email        String         @unique
-  name         String
-  passwordHash String
-  role         Role           @default(HR_ADMIN)
-  // For MANAGER and EMPLOYEE accounts: the employee they are
-  employeeId   Int?           @unique
-  employee     Employee?      @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
-  decidedLeave LeaveRequest[] @relation("LeaveDecidedByAdmin")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id                  Int                    @id @default(autoincrement())
+  email               String                 @unique
+  name                String
+  passwordHash        String
+  role                Role                   @default(HR_ADMIN)
+  // For MANAGER and EMPLOYEE accounts: the employee they are (a manager's team hangs off it)
+  employeeId          Int?                   @unique
+  employee            Employee?              @relation("AdminEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
+  // Attendance corrections this HR admin approved, rejected or made
+  correctionDecisions AttendanceCorrection[] @relation("CorrectionDecider")
+  // Leave requests this HR admin approved or rejected
+  decidedLeave        LeaveRequest[]         @relation("LeaveDecidedByAdmin")
+  approvedDevices     RegisteredDevice[]     @relation("DeviceApprover")
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+}
+
+// The one phone a person checks in from. The phone makes a random key, keeps it and sends it with
+// every check-in and check-out; the server keeps only the key's SHA-256 hash. A new phone waits
+// (PENDING) until an HR admin approves it. HR removes the row to reject a waiting phone or to
+// reset a lost or replaced one, and the person registers the new one.
+model RegisteredDevice {
+  id           Int       @id @default(autoincrement())
+  employeeId   Int       @unique
+  employee     Employee  @relation("EmployeeDevice", fields: [employeeId], references: [id], onDelete: Cascade)
+  keyHash      String
+  platform     String? // android or ios
+  status       String    @default("PENDING") // PENDING, APPROVED
+  // The HR admin account that approved it
+  approvedById Int?
+  approvedBy   Admin?    @relation("DeviceApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now()) // when it was registered
+  lastUsedAt   DateTime?
 }

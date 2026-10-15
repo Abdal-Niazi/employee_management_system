@@ -6,6 +6,7 @@ import Avatar from "../../../../components/Avatar";
 import Button from "../../../../components/Button";
 import Card from "../../../../components/Card";
 import ConfirmModal from "../../../../components/ConfirmModal";
+import PhoneCard from "../../../../components/PhoneCard";
 import { ErrorState, LoadingState } from "../../../../components/States";
 import StatusPill from "../../../../components/StatusPill";
 import { useAsync } from "../../../../hooks/useAsync";
@@ -82,6 +83,8 @@ export default function EmployeeScreen() {
           <DetailRow label="Manager" value={manager ? fullName(manager) : null} />
         </Card>
 
+        <PhoneCard employeeId={employee.id} name={employee.firstName} />
+
         <Button title="Edit employee" icon="create-outline" onPress={() => router.push(`/employee/edit/${employee.id}`)} />
         <Button
           title="Delete employee"
@@ -96,7 +99,7 @@ export default function EmployeeScreen() {
         <ConfirmModal
           visible={confirmingDelete}
           title="Delete employee?"
-          message={`${fullName(employee)} will be removed for good, together with their leave requests. This can't be undone.`}
+          message={`${fullName(employee)} will be removed for good, together with their leave requests and attendance. Their past attendance changes stay on record. This can't be undone.`}
           confirmLabel="Delete"
           danger
           submitting={deleting}

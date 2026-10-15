@@ -21,9 +21,10 @@ const summarize = (rows) =>
     return { type, entitlement, used, pending, remaining: Math.max(entitlement - used - pending, 0) };
   });
 
-// One person's balance in `year`. Rejected and cancelled requests don't count.
-const getBalance = async (employeeId, year) => {
-  const rows = await prisma.leaveRequest.findMany({
+// One person's balance in `year`. Rejected and cancelled requests don't count. `db` is a
+// transaction when the balance is checked before saving a request.
+const getBalance = async (employeeId, year, db = prisma) => {
+  const rows = await db.leaveRequest.findMany({
     where: { employeeId, status: { in: ["PENDING", "APPROVED"] }, startDate: yearRange(year) },
     select: { type: true, status: true, days: true },
   });

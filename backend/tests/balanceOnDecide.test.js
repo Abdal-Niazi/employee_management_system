@@ -86,9 +86,7 @@ describe("HR deciding leave", () => {
 
 describe("the employee's own list", () => {
   test("is unchanged: no balance on the requests (the balance has its own endpoint)", async () => {
-    const { account } = require("./helpers");
-    await account("amir@example.com", "EMPLOYEE", data.a1.id);
-    const amir = await login("amir@example.com");
+    const amir = await login("employee.a1@example.com"); // the fixtures give A-1 this account
 
     const res = await request(app).get("/api/me/leave-requests").set(amir);
     assert.ok(res.body.leaveRequests.every((r) => r.balance === null));

@@ -20,11 +20,6 @@ export function addDays(key, days) {
   return toDateKey(date);
 }
 
-export function isWeekend(key) {
-  const day = fromDateKey(key).getDay();
-  return day === 0 || day === 6;
-}
-
 export function formatDay(key) {
   return fromDateKey(key).toLocaleDateString(undefined, {
     weekday: "short",
@@ -33,8 +28,8 @@ export function formatDay(key) {
   });
 }
 
-export function relativeDayLabel(key) {
-  const today = todayKey();
+// `today` should be the company's day from the server; the device's day is only a fallback.
+export function relativeDayLabel(key, today = todayKey()) {
   if (key === today) return "Today";
   if (key === addDays(today, -1)) return "Yesterday";
   return formatDay(key);
@@ -52,6 +47,26 @@ export function formatIsoDate(iso) {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+// A real moment (e.g. when a phone was registered), in the phone's own time: "15 Oct, 09:42".
+export function formatMoment(iso) {
+  return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// Typed times to "HH:MM": "9:20", "0920" and "920" all become "09:20". Anything else is null.
+export function normalizeTime(text) {
+  const match = /^(\d{1,2}):?(\d{2})$/.exec(text.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return `${pad(hours)}:${pad(minutes)}`;
+}
+
+// "09:20 – 17:05", or "09:20 – …" before check-out.
+export function timeRange(checkIn, checkOut) {
+  return checkIn ? `${checkIn} – ${checkOut ?? "…"}` : "";
 }
 
 // Counts calendar days, so something from yesterday evening is "yesterday", not "today".

@@ -1,6 +1,8 @@
 const prisma = require("../utils/prisma");
 const AppError = require("../utils/AppError");
 const leaveBalance = require("./leaveBalanceService");
+// startDate/endDate are DATE columns, read back as UTC midnight.
+const { toDateKey } = require("../utils/companyTime");
 
 const getManager = async (managerId) => {
   const manager = await prisma.employee.findUnique({
@@ -55,9 +57,6 @@ const deciderName = (row) => {
   if (row.decidedByAdmin) return `${row.decidedByAdmin.name} (HR)`;
   return null;
 };
-
-// startDate/endDate are DATE columns, read back as UTC midnight.
-const toDateKey = (date) => date.toISOString().slice(0, 10);
 
 // The shape the mobile app uses.
 const toLeaveDto = (row) => ({

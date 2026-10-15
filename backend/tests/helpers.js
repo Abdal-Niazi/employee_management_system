@@ -1,4 +1,5 @@
 // Shared setup for the API tests. Only ever runs against TEST_DATABASE_URL (see scripts/test.js).
+const crypto = require("crypto");
 const request = require("supertest");
 const app = require("../src/app");
 const prisma = require("../src/utils/prisma");
@@ -7,7 +8,9 @@ const authService = require("../src/services/authService");
 const PASSWORD = "Correct-horse-42";
 
 const resetDatabase = () =>
-  prisma.$executeRawUnsafe('TRUNCATE TABLE "Attendance", "LeaveRequest", "Admin", "Employee" RESTART IDENTITY CASCADE');
+  prisma.$executeRawUnsafe(
+    'TRUNCATE TABLE "RegisteredDevice", "AttendanceCorrection", "Attendance", "LeaveRequest", "Admin", "Employee" RESTART IDENTITY CASCADE'
+  );
 
 const employee = (code, firstName, managerId = null) =>
   prisma.employee.create({
@@ -40,7 +43,8 @@ const leave = (employeeId, status = "PENDING") =>
     },
   });
 
-// Two managers with their own teams, an HR admin, and a manager account whose employee is gone.
+// Two managers with their own teams, an HR admin, an employee account for a1, and a manager
+// account whose employee is gone.
 const seedFixtures = async () => {
   await resetDatabase();
 
@@ -53,6 +57,7 @@ const seedFixtures = async () => {
   await account("hr@example.com", "HR_ADMIN");
   await account("manager.a@example.com", "MANAGER", managerA.id);
   await account("manager.b@example.com", "MANAGER", managerB.id);
+  await account("employee.a1@example.com", "EMPLOYEE", a1.id);
   await account("unlinked@example.com", "MANAGER", null);
 
   const leaveA1 = await leave(a1.id);
@@ -69,4 +74,17 @@ const login = async (email) => {
   return { Authorization: `Bearer ${res.body.token}` };
 };
 
-module.exports = { app, prisma, request, PASSWORD, resetDatabase, seedFixtures, login, account };
+// A phone's key, made the way the app makes it
+const newDeviceKey = () => crypto.randomBytes(32).toString("base64url");
+
+// Registers a phone for the signed-in account and approves it the way HR would. Returns the
+// headers of that account on that phone (its key goes with every request).
+const onApprovedPhone = async (auth, employeeId) => {
+  const key = newDeviceKey();
+  const res = await request(app).post("/api/me/device").set(auth).send({ platform: "android", key });
+  if (res.status !== 201) throw new Error(`Phone registration failed: ${res.status}`);
+  await prisma.registeredDevice.update({ where: { employeeId }, data: { status: "APPROVED", approvedAt: new Date() } });
+  return { ...auth, "X-Device-Key": key };
+};
+
+module.exports = { app, prisma, request, PASSWORD, resetDatabase, seedFixtures, login, account, newDeviceKey, onApprovedPhone };

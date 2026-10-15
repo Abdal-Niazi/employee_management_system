@@ -40,6 +40,12 @@ function EmployeeRow({ employee, onPress }) {
           {role || "No position set"}
         </Text>
         <Text style={styles.id}>{employee.employeeId}</Text>
+        {employee.phoneStatus === "PENDING" && (
+          <View style={styles.phoneTag}>
+            <Ionicons name="phone-portrait-outline" size={12} color={colors.warning} />
+            <Text style={styles.phoneTagText}>Phone waiting for approval</Text>
+          </View>
+        )}
       </View>
       <StatusPill status={employee.status} />
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
@@ -131,4 +137,16 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 1 },
   name: { fontSize: 15, fontWeight: "600", color: colors.text },
   id: { fontSize: 12, color: colors.muted, fontWeight: "600" },
+  phoneTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    backgroundColor: colors.warningSoft,
+  },
+  phoneTagText: { fontSize: 12, color: colors.warning, fontWeight: "600" },
 });

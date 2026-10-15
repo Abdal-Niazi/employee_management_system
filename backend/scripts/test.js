@@ -34,6 +34,13 @@ const env = {
   JWT_SECRET: process.env.JWT_SECRET || "test-only-secret-that-is-long-enough-1234",
   LOGIN_RATE_LIMIT: "5",
   API_RATE_LIMIT: "10000",
+  IP_RATE_LIMIT: "100000",
+  LOGIN_IP_RATE_LIMIT: "20",
+  // The attendance tests expect the default shift, whatever .env says.
+  SHIFT_START: "09:00",
+  SHIFT_END: "17:00",
+  LATE_GRACE_MINUTES: "5",
+  COMPANY_TIMEZONE: "Asia/Karachi",
 };
 
 const run = (args) => spawnSync(process.execPath, args, { env, stdio: "inherit", cwd: path.join(__dirname, "..") });

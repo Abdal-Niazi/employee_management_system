@@ -1,9 +1,9 @@
-// Creates an HR admin or manager account. Run from backend: npm run create-admin
+// Creates an HR admin, manager or employee account. Run from backend: npm run create-admin
 require("dotenv").config({ quiet: true });
 
 const prisma = require("../src/utils/prisma");
 const authService = require("../src/services/authService");
-const { createAdminSchema } = require("../src/validators/authSchema");
+const { LINKED_ROLES, createAdminSchema } = require("../src/validators/authSchema");
 
 // Input is read straight from stdin rather than through readline, whose line
 // redrawing garbles prompts in some Windows terminals. Normal answers use the
@@ -86,8 +86,9 @@ const main = async () => {
     role: (await ask("Role (HR_ADMIN, MANAGER or EMPLOYEE) [HR_ADMIN]: ")).trim().toUpperCase() || "HR_ADMIN",
   };
 
-  // Manager and employee accounts belong to one employee (a manager's team is the people reporting to them).
-  if (input.role === "MANAGER" || input.role === "EMPLOYEE") {
+  // Manager and employee accounts belong to one employee: a manager is the person whose
+  // team it manages, and an employee account checks that person in and out.
+  if (LINKED_ROLES.includes(input.role)) {
     // The employee ID is the code HR sees in the app (for example EMP001), not the database id.
     const code = (await ask("Employee ID this account belongs to (the code shown in the app, e.g. EMP001): ")).trim();
     const employee = code ? await prisma.employee.findUnique({ where: { employeeId: code } }) : null;

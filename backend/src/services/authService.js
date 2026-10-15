@@ -9,7 +9,7 @@ const BCRYPT_ROUNDS = 12;
 // as long as a wrong password and doesn't reveal which emails are admins.
 const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", BCRYPT_ROUNDS);
 
-// employeeId is set for MANAGER accounts: the employee whose team they manage.
+// employeeId is set for MANAGER and EMPLOYEE accounts: the employee the account belongs to.
 const toPublicAdmin = ({ id, email, name, role, employeeId }) => ({ id, email, name, role, employeeId });
 
 const hashPassword = (password) => bcrypt.hash(password, BCRYPT_ROUNDS);

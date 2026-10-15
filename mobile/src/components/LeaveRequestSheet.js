@@ -19,22 +19,23 @@ function isRealDate(text) {
 }
 
 // Pop-up form to ask for leave. A custom modal because Alert.prompt only exists on iOS.
-export default function LeaveRequestSheet({ visible, balance, saving, error, onCancel, onSubmit }) {
+// `today` is the company's day from the server; the phone's day is only a fallback.
+export default function LeaveRequestSheet({ visible, today, balance, saving, error, onCancel, onSubmit }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={saving ? undefined : onCancel} />
         {/* Mounted only while open, so the form starts fresh every time. */}
-        {visible && <Form balance={balance} saving={saving} error={error} onCancel={onCancel} onSubmit={onSubmit} />}
+        {visible && <Form today={today ?? todayKey()} balance={balance} saving={saving} error={error} onCancel={onCancel} onSubmit={onSubmit} />}
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-function Form({ balance, saving, error, onCancel, onSubmit }) {
+function Form({ today, balance, saving, error, onCancel, onSubmit }) {
   const [type, setType] = useState("Annual");
-  const [startDate, setStartDate] = useState(todayKey());
-  const [endDate, setEndDate] = useState(todayKey());
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState("");
 

@@ -18,9 +18,8 @@ const request_ = (type, startDate, endDate) => ({ type, startDate, endDate });
 
 before(async () => {
   data = await seedFixtures();
-  await account("amir@example.com", "EMPLOYEE", data.a1.id);
   await account("ayesha@example.com", "EMPLOYEE", data.a2.id);
-  amir = await login("amir@example.com");
+  amir = await login("employee.a1@example.com"); // the fixtures give A-1 this account
   ayesha = await login("ayesha@example.com");
   hr = await login("hr@example.com");
 });
