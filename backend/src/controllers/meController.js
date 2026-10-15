@@ -58,8 +58,9 @@ const registerDevice = async (req, res) => {
 // Check-in and check-out only count from the registered phone, checked before anything else.
 const checkIn = async (req, res) => {
   const employee = await resolveSelf(req);
-  await deviceService.verifyDevice(employee, req.get(deviceService.DEVICE_KEY_HEADER));
+  const device = await deviceService.verifyDevice(employee, req.get(deviceService.DEVICE_KEY_HEADER));
   const day = await attendanceService.checkIn(employee);
+  await deviceService.markUsed(device);
 
   res.status(200).json({
     message: "Checked in",
@@ -70,8 +71,9 @@ const checkIn = async (req, res) => {
 
 const checkOut = async (req, res) => {
   const employee = await resolveSelf(req);
-  await deviceService.verifyDevice(employee, req.get(deviceService.DEVICE_KEY_HEADER));
+  const device = await deviceService.verifyDevice(employee, req.get(deviceService.DEVICE_KEY_HEADER));
   const day = await attendanceService.checkOut(employee);
+  await deviceService.markUsed(device);
 
   res.status(200).json({
     message: "Checked out",

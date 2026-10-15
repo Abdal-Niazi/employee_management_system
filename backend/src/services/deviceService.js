@@ -62,7 +62,7 @@ const registerDevice = async (employee, { platform, key }) => {
   return toDeviceDto({ ...device, approvedBy: null });
 };
 
-// Throws unless `key` is the key of this person's approved phone.
+// Throws unless `key` is the key of this person's approved phone; returns that phone.
 const verifyDevice = async (employee, key) => {
   // Only app builds from before registered phones send no key at all
   if (key === undefined) {
@@ -82,14 +82,17 @@ const verifyDevice = async (employee, key) => {
     throw new AppError("This phone is waiting for HR to approve it", 403);
   }
 
-  await prisma.registeredDevice.update({ where: { id: device.id }, data: { lastUsedAt: new Date() } });
+  return device;
 };
 
-// HR: lets a waiting phone check in. Checked in the same statement as the change, so it can't
-// approve a phone that was just reset or replaced by another one.
+// After a check-in or check-out went through (not a refused one), so HR sees when it was last used.
+const markUsed = (device) => prisma.registeredDevice.update({ where: { id: device.id }, data: { lastUsedAt: new Date() } });
+
+// HR: lets the waiting phone HR looked at (registered at `registeredAt`) check in. Checked in the
+// same statement as the change, so it can't approve a phone that was just reset or replaced.
 const approveDevice = async (employeeId, adminId, registeredAt) => {
   const { count } = await prisma.registeredDevice.updateMany({
-    where: { employeeId, status: "PENDING", ...(registeredAt && { createdAt: new Date(registeredAt) }) },
+    where: { employeeId, status: "PENDING", createdAt: new Date(registeredAt) },
     data: { status: "APPROVED", approvedById: adminId, approvedAt: new Date() },
   });
 
@@ -118,6 +121,7 @@ module.exports = {
   ownDevice,
   registerDevice,
   verifyDevice,
+  markUsed,
   approveDevice,
   resetDevice,
 };

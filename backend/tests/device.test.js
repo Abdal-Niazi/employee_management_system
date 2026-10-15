@@ -26,7 +26,10 @@ describe("registered phones", () => {
   const today = (headers, deviceKey) => withKey(request(app).get("/api/me/attendance/today").set(headers), deviceKey);
 
   const deviceUrl = (employeeId) => `/api/employees/${employeeId}/device`;
-  const approve = (employeeId, body = {}) => request(app).post(`${deviceUrl(employeeId)}/approve`).set(hr).send(body);
+  // HR always says which waiting phone it looked at (by when it was registered)
+  const approve = (employeeId, registeredAt = "2026-01-01T00:00:00.000Z") =>
+    request(app).post(`${deviceUrl(employeeId)}/approve`).set(hr).send({ registeredAt });
+  const lastUsed = async () => (await prisma.registeredDevice.findUnique({ where: { employeeId: data.a1.id } })).lastUsedAt;
 
   // A check-in that got past the phone check: what happens next depends on the day
   const pastPhoneCheck = (res) => res.status !== 403;
@@ -101,21 +104,24 @@ describe("registered phones", () => {
     assert.equal((await request(app).post(`${deviceUrl(data.a1.id)}/approve`).set(manager)).status, 403);
   });
 
-  test("approving refuses a phone that replaced the one HR looked at", async () => {
-    const res = await approve(data.a1.id, { registeredAt: "2020-01-01T00:00:00.000Z" });
+  test("approving needs the phone HR looked at, and refuses one that replaced it", async () => {
+    const missing = await request(app).post(`${deviceUrl(data.a1.id)}/approve`).set(hr).send({});
+    assert.equal(missing.status, 422);
+
+    const res = await approve(data.a1.id, "2020-01-01T00:00:00.000Z");
     assert.equal(res.status, 409);
     assert.match(res.body.message, /changed/);
   });
 
   test("once approved, check-in and check-out work only with that phone's key", async () => {
     const seen = await request(app).get(deviceUrl(data.a1.id)).set(hr);
-    const res = await approve(data.a1.id, { registeredAt: seen.body.device.registeredAt });
+    const res = await approve(data.a1.id, seen.body.device.registeredAt);
     assert.equal(res.status, 200);
     assert.equal(res.body.device.status, "APPROVED");
     assert.equal(res.body.device.approvedBy, "hr");
     assert.ok(res.body.device.approvedAt);
 
-    assert.equal((await approve(data.a1.id)).status, 409);
+    assert.equal((await approve(data.a1.id, seen.body.device.registeredAt)).status, 409);
     assert.equal((await approve(data.a2.id)).status, 404);
     assert.equal((await approve(99999)).status, 404);
 
@@ -124,9 +130,18 @@ describe("registered phones", () => {
     const wrongOut = await request(app).post("/api/me/attendance/check-out").set(employee).set("X-Device-Key", "wrong");
     assert.equal(wrongOut.status, 403);
 
-    assert.ok(pastPhoneCheck(await checkIn(employee, key)));
-    const device = await prisma.registeredDevice.findUnique({ where: { employeeId: data.a1.id } });
-    assert.ok(device.lastUsedAt);
+    // Refused attempts don't count as using the phone
+    assert.equal(await lastUsed(), null);
+  });
+
+  test("the phone's last use is a check-in or out that went through, not a refused one", async () => {
+    assert.equal((await checkIn(employee, key)).status, 200);
+    const used = await lastUsed();
+    assert.ok(used);
+
+    // Already checked in today: refused, and the last use stays as it was
+    assert.equal((await checkIn(employee, key)).status, 409);
+    assert.deepEqual(await lastUsed(), used);
   });
 
   test("an approved phone can't be replaced by registering again", async () => {

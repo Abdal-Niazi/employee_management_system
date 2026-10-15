@@ -28,7 +28,7 @@ const getDevice = async (req, res) => {
 // HR: let a waiting phone check in.
 const approveDevice = async (req, res) => {
   const employee = await findEmployee(req);
-  const device = await deviceService.approveDevice(employee.id, req.admin.id, req.body?.registeredAt);
+  const device = await deviceService.approveDevice(employee.id, req.admin.id, req.body.registeredAt);
 
   res.status(200).json({
     message: "Phone approved",

@@ -9,10 +9,10 @@ const registerDeviceSchema = z.object({
     .regex(/^[A-Za-z0-9_-]{43,100}$/, { error: "key must be 43 to 100 letters, digits, - or _" }),
 });
 
-// Body of POST /api/employees/:id/device/approve. `registeredAt` is the waiting phone HR looked at;
-// if another phone replaced it since, the approval is refused.
+// Body of POST /api/employees/:id/device/approve. `registeredAt` is the waiting phone HR looked at
+// (required, so no approval skips the check); if another phone replaced it since, it is refused.
 const approveDeviceSchema = z.object({
-  registeredAt: z.iso.datetime({ error: "registeredAt must be a date and time" }).optional(),
+  registeredAt: z.iso.datetime({ error: "registeredAt must be the date and time of the phone you looked at" }),
 });
 
 module.exports = { registerDeviceSchema, approveDeviceSchema };

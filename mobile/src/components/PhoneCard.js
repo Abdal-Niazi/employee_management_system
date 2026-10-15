@@ -51,25 +51,26 @@ export default function PhoneCard({ employeeId, name }) {
   const { status, data: device, error, reload, revalidate } = useAsync(load);
   const [asking, setAsking] = useState(null); // "approve" | "reject" | "reset"
   const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState("");
+  const [cardError, setCardError] = useState("");
 
   const open = (what) => {
-    setActionError("");
+    setCardError("");
     setAsking(what);
   };
 
+  // A refusal closes the dialog and shows on the card, which reloads: if another phone replaced
+  // the one HR looked at, HR sees the new one before they can approve again.
   const handleConfirm = async () => {
     setBusy(true);
-    setActionError("");
     try {
       if (asking === "approve") await approveEmployeeDevice(employeeId, device.registeredAt);
       else await resetEmployeeDevice(employeeId);
-      setAsking(null);
+      setCardError("");
     } catch (err) {
-      setActionError(err.message);
+      setCardError(err.message);
     } finally {
+      setAsking(null);
       setBusy(false);
-      // Also after a refusal (say the phone changed meanwhile), so the card shows what is there now
       revalidate();
     }
   };
@@ -125,7 +126,10 @@ export default function PhoneCard({ employeeId, name }) {
 
   return (
     <Card title="Check-in phone">
-      <View style={styles.body}>{body}</View>
+      <View style={styles.body}>
+        {cardError ? <Text style={styles.error}>{cardError}</Text> : null}
+        {body}
+      </View>
       <ConfirmModal
         visible={Boolean(confirm)}
         title={confirm?.title ?? ""}
@@ -133,7 +137,6 @@ export default function PhoneCard({ employeeId, name }) {
         confirmLabel={confirm?.label ?? ""}
         danger={confirm?.danger}
         submitting={busy}
-        error={actionError}
         onCancel={() => setAsking(null)}
         onConfirm={handleConfirm}
       />
