@@ -38,7 +38,8 @@ export default function LeaveCard({ request, onApprove, onReject, onCancel, show
         <Ionicons name="calendar-outline" size={16} color={colors.muted} />
         <Text style={font.body}>{leaveSummary(request)}</Text>
       </View>
-      {request.reason ? <Text style={[font.body, styles.reason]}>“{request.reason}”</Text> : <View style={styles.noReason} />}
+      {/* The reason is optional */}
+      {request.reason ? <Text style={[font.body, styles.reason]}>“{request.reason}”</Text> : null}
 
       {pending && request.balance && (
         <Text style={[font.small, request.balance.remaining === 0 && styles.warning]}>
@@ -47,14 +48,14 @@ export default function LeaveCard({ request, onApprove, onReject, onCancel, show
       )}
 
       {showManager && (
-        <Text style={[font.small, !request.managerName && styles.noManager]}>
+        <Text style={[font.small, !request.reason && styles.noReason, !request.managerName && styles.noManager]}>
           {request.managerName ? `Manager: ${request.managerName}` : "No manager assigned, so HR decides"}
         </Text>
       )}
 
-      <Text style={font.small}>
+      <Text style={[font.small, !request.reason && !showManager && styles.noReason]}>
         Requested {timeAgo(request.requestedAt)}
-        {!pending && ` · ${statusInfo(request.status).label} ${timeAgo(request.decidedAt)}`}
+        {!pending && request.decidedAt && ` · ${statusInfo(request.status).label} ${timeAgo(request.decidedAt)}`}
         {!pending && request.decidedBy ? ` by ${request.decidedBy}` : ""}
       </Text>
       {request.decisionNote && <Text style={[font.small, styles.note]}>Note: {request.decisionNote}</Text>}
@@ -86,7 +87,7 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, gap: 2 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   reason: { color: colors.muted, fontStyle: "italic", marginVertical: spacing.sm },
-  noReason: { height: spacing.sm },
+  noReason: { marginTop: spacing.sm },
   noManager: { color: colors.warning, fontWeight: "600" },
   warning: { color: colors.warning, fontWeight: "600" },
   note: { marginTop: spacing.xs, color: colors.text },

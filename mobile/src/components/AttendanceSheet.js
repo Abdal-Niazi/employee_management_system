@@ -1,30 +1,43 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { colors, font, radius, spacing } from "../theme";
+import { normalizeTime } from "../utils/date";
 import { fullName } from "../utils/status";
 import Button from "./Button";
 
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-// Pop-up for writing or correcting one employee's check-in / check-out for a day.
-// A custom modal rather than Alert.prompt, which doesn't exist on Android or web.
+// Pop-up for HR to write, fix or remove one person's check-in / check-out for a day. Every change
+// is kept in the history with the optional note. A custom modal rather than Alert.prompt, which
+// doesn't exist on Android or web.
 export default function AttendanceSheet({ row, dateLabel, saving, error, onCancel, onSave, onRemove }) {
   return (
     <Modal visible={Boolean(row)} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={saving ? undefined : onCancel} />
         {row && (
-          // Keyed by person and day, so the fields start from that record every time.
-          <Sheet
-            key={`${row.employee.id}:${dateLabel}`}
-            row={row}
-            dateLabel={dateLabel}
-            saving={saving}
-            error={error}
-            onCancel={onCancel}
-            onSave={onSave}
-            onRemove={onRemove}
-          />
+          // Scrolls on small phones while the keyboard is open.
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            {/* Keyed by person and day, so the fields start from that record every time. */}
+            <Sheet
+              key={`${row.employee.id}:${dateLabel}`}
+              row={row}
+              dateLabel={dateLabel}
+              saving={saving}
+              error={error}
+              onCancel={onCancel}
+              onSave={onSave}
+              onRemove={onRemove}
+            />
+          </ScrollView>
         )}
       </KeyboardAvoidingView>
     </Modal>
@@ -35,32 +48,41 @@ function Sheet({ row, dateLabel, saving, error, onCancel, onSave, onRemove }) {
   const saved = Boolean(row.record.checkIn);
   const [checkIn, setCheckIn] = useState(row.record.checkIn ?? "");
   const [checkOut, setCheckOut] = useState(row.record.checkOut ?? "");
+  const [note, setNote] = useState("");
   const [problem, setProblem] = useState("");
   const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const handleSave = () => {
-    const inTime = checkIn.trim();
-    const outTime = checkOut.trim();
+    // "9:05", "0905" and "905" all become "09:05"
+    const inTime = normalizeTime(checkIn);
+    const outTime = checkOut.trim() ? normalizeTime(checkOut) : null;
 
-    if (!TIME.test(inTime)) return setProblem("Check-in must be a time like 09:00 (24-hour).");
-    if (outTime && !TIME.test(outTime)) return setProblem("Check-out must be a time like 17:30 (24-hour).");
+    if (!inTime) return setProblem("Check-in must be a time like 09:00 (24-hour).");
+    if (checkOut.trim() && !outTime) return setProblem("Check-out must be a time like 17:30 (24-hour).");
     if (outTime && outTime <= inTime) return setProblem("Check-out must be after check-in.");
 
     setProblem("");
-    onSave({ checkIn: inTime, checkOut: outTime || null });
+    onSave({ checkIn: inTime, checkOut: outTime, note });
   };
 
   const shown = problem || error;
+  const waiting = row.record.correction?.status === "PENDING";
 
   return (
     <View style={styles.sheet}>
       <Text style={font.title}>{fullName(row.employee)}</Text>
       <Text style={font.small}>{dateLabel}</Text>
+      {waiting ? (
+        <Text style={[font.small, styles.waiting]}>
+          A manager&apos;s correction for this day is waiting. You can decide it under Requests from managers.
+        </Text>
+      ) : null}
 
       {confirmingRemove ? (
         <>
           <Text style={[font.body, styles.confirmText]}>
-            Remove this day&apos;s check-in? The day will count as absent again.
+            Remove this day&apos;s check-in? The day will show no check-in again. The change is kept in the
+            history{note.trim() ? ", with your note" : ""}.
           </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.actions}>
@@ -71,7 +93,13 @@ function Sheet({ row, dateLabel, saving, error, onCancel, onSave, onRemove }) {
               disabled={saving}
               style={styles.action}
             />
-            <Button title="Remove" variant="dangerSolid" loading={saving} onPress={onRemove} style={styles.action} />
+            <Button
+              title="Remove"
+              variant="dangerSolid"
+              loading={saving}
+              onPress={() => onRemove(note)}
+              style={styles.action}
+            />
           </View>
         </>
       ) : (
@@ -108,6 +136,18 @@ function Sheet({ row, dateLabel, saving, error, onCancel, onSave, onRemove }) {
             style={styles.input}
           />
 
+          <Text style={styles.label}>Note (optional)</Text>
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="Why the change? Kept in the history."
+            placeholderTextColor={colors.muted}
+            multiline
+            maxLength={500} // the server's limit
+            editable={!saving}
+            style={[styles.input, styles.note]}
+          />
+
           {shown ? <Text style={styles.error}>{shown}</Text> : null}
 
           <View style={styles.actions}>
@@ -122,7 +162,7 @@ function Sheet({ row, dateLabel, saving, error, onCancel, onSave, onRemove }) {
               disabled={saving}
               style={({ pressed }) => [styles.remove, pressed && { opacity: 0.6 }]}
             >
-              <Text style={styles.removeText}>Remove record</Text>
+              <Text style={styles.removeText}>Remove check-in</Text>
             </Pressable>
           ) : null}
         </>
@@ -138,6 +178,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: "rgba(16, 24, 40, 0.45)",
   },
+  scroll: { flexGrow: 0, maxHeight: "100%" },
+  scrollContent: { flexGrow: 1, justifyContent: "center" },
   sheet: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -158,6 +200,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.surface,
   },
+  note: { minHeight: 64, paddingTop: spacing.md, textAlignVertical: "top" },
+  waiting: { color: colors.warning, marginTop: spacing.xs },
   confirmText: { marginTop: spacing.md },
   error: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   actions: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },

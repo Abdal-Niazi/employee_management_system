@@ -11,6 +11,8 @@ const STATUS = {
   ON_LEAVE: { label: "On leave", tone: "info" },
   NOT_IN: { label: "Not in yet", tone: "neutral" },
   OFF: { label: "Off", tone: "neutral" },
+  // Someone whose employee record isn't active: not expected at work
+  INACTIVE: { label: "Inactive", tone: "neutral" },
   // Leave requests
   PENDING: { label: "Pending", tone: "warning" },
   APPROVED: { label: "Approved", tone: "success" },

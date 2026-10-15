@@ -3,7 +3,7 @@ const leaveController = require("../controllers/leaveController");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
 const validate = require("../middleware/validate");
-const { decideLeaveSchema } = require("../validators/managerSchema");
+const { decisionSchema } = require("../validators/managerSchema");
 
 const router = express.Router();
 
@@ -12,6 +12,6 @@ router.use(requireAuth, requireRole("HR_ADMIN"));
 
 router.get("/", leaveController.getLeaveRequests);
 
-router.patch("/:id", validate(decideLeaveSchema), leaveController.decideLeave);
+router.patch("/:id", validate(decisionSchema), leaveController.decideLeave);
 
 module.exports = router;

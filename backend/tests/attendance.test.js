@@ -1,199 +1,420 @@
-const { after, before, beforeEach, describe, test } = require("node:test");
+const { after, before, describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const { app, prisma, request, seedFixtures, login } = require("./helpers");
-const { buildRecord, localDateKey } = require("../src/services/attendanceService");
+const {
+  addDays,
+  asDbDate,
+  fromCompanyTime,
+  isDateKey,
+  isWeekend,
+  toCompanyTime,
+  todayKey,
+} = require("../src/utils/companyTime");
+const { attendanceStatus } = require("../src/utils/attendanceRules");
+const attendanceService = require("../src/services/attendanceService");
 
-// Fixed days far from "now": a Monday, the Saturday before it, a later Tuesday on which A-1 has approved leave.
-const MONDAY = "2026-10-05";
-const TUESDAY_AFTER = "2026-10-06";
-const SATURDAY = "2026-10-03";
-const LEAVE_DAY = "2026-11-03";
+// A fixed past week: Tuesday 10 March 2026 is a work day, Saturday 14 March is not.
+const TUESDAY = "2026-03-10";
+const SATURDAY = "2026-03-14";
 
-let data;
-let managerA;
-let hr;
+const at = (dateKey, time) => fromCompanyTime(dateKey, time);
 
-const checkIn = (employee, dateKey, time, out = null) =>
+const checkIn = (employeeId, dateKey, inTime, outTime = null) =>
   prisma.attendance.create({
-    data: { employeeId: employee.id, date: new Date(`${dateKey}T00:00:00Z`), checkIn: time, checkOut: out },
+    data: {
+      employeeId,
+      date: asDbDate(dateKey),
+      checkIn: at(dateKey, inTime),
+      checkOut: outTime ? at(dateKey, outTime) : null,
+    },
   });
 
-before(async () => {
-  data = await seedFixtures();
-  managerA = await login("manager.a@example.com");
-  hr = await login("hr@example.com");
+const approvedLeave = (employeeId, dateKey) =>
+  prisma.leaveRequest.create({
+    data: {
+      employeeId,
+      type: "Sick",
+      startDate: asDbDate(dateKey),
+      endDate: asDbDate(dateKey),
+      days: 1,
+      status: "APPROVED",
+      decidedAt: new Date(),
+    },
+  });
+
+describe("status rules", () => {
+  const noon = at(TUESDAY, "12:00");
+  const base = { dateKey: TUESDAY, hireDateKey: "2024-01-15", onLeave: false, record: null, now: noon };
+
+  test("weekends and days before hiring are off", () => {
+    assert.equal(attendanceStatus({ ...base, dateKey: SATURDAY }), "OFF");
+    assert.equal(attendanceStatus({ ...base, hireDateKey: "2026-03-11" }), "OFF");
+  });
+
+  test("approved leave wins over everything else on a work day", () => {
+    assert.equal(attendanceStatus({ ...base, onLeave: true, record: { checkIn: at(TUESDAY, "09:00") } }), "ON_LEAVE");
+  });
+
+  test("late means more than 5 minutes after 09:00", () => {
+    assert.equal(attendanceStatus({ ...base, record: { checkIn: at(TUESDAY, "08:40") } }), "PRESENT");
+    assert.equal(attendanceStatus({ ...base, record: { checkIn: at(TUESDAY, "09:05") } }), "PRESENT");
+    assert.equal(attendanceStatus({ ...base, record: { checkIn: at(TUESDAY, "09:06") } }), "LATE");
+  });
+
+  test("someone who isn't active is never absent", () => {
+    assert.equal(attendanceStatus({ ...base, active: false }), "INACTIVE");
+    assert.equal(attendanceStatus({ ...base, active: false, dateKey: "2026-03-09" }), "INACTIVE");
+    assert.equal(attendanceStatus({ ...base, active: false, record: { checkIn: at(TUESDAY, "09:00") } }), "PRESENT");
+    assert.equal(attendanceStatus({ ...base, active: false, dateKey: SATURDAY }), "OFF");
+  });
+
+  test("no check-in is 'not in yet' until the shift ends, then absent", () => {
+    assert.equal(attendanceStatus(base), "NOT_IN");
+    assert.equal(attendanceStatus({ ...base, now: at(TUESDAY, "16:59") }), "NOT_IN");
+    assert.equal(attendanceStatus({ ...base, now: at(TUESDAY, "17:00") }), "ABSENT");
+    assert.equal(attendanceStatus({ ...base, dateKey: "2026-03-09" }), "ABSENT");
+  });
 });
-beforeEach(() => prisma.attendance.deleteMany());
-after(() => prisma.$disconnect());
 
-describe("how a day's status is worked out", () => {
-  const employee = { id: 1, employeeId: "E-1", hireDate: new Date("2024-01-15") };
-  const record = (overrides) => buildRecord({ employee, dateKey: MONDAY, now: new Date(2026, 9, 20, 12, 0), ...overrides });
-
-  test("a check-in within the grace period is on time, after it is late", () => {
-    assert.equal(record({ row: { checkIn: "09:05", checkOut: null } }).status, "PRESENT");
-    assert.equal(record({ row: { checkIn: "09:06", checkOut: null } }).status, "LATE");
-    assert.equal(record({ row: { checkIn: "08:30", checkOut: "17:00" } }).checkOut, "17:00");
+describe("company time", () => {
+  test("converts Pakistan time to UTC and back", () => {
+    assert.equal(at(TUESDAY, "09:00").toISOString(), "2026-03-10T04:00:00.000Z");
+    assert.equal(at(TUESDAY, "02:30").toISOString(), "2026-03-09T21:30:00.000Z");
+    assert.equal(toCompanyTime(new Date("2026-03-10T04:00:00Z")), "09:00");
+    assert.equal(todayKey(new Date("2026-03-10T20:00:00Z")), "2026-03-11");
   });
 
-  test("nobody is absent until the shift is over", () => {
-    const today = { dateKey: "2026-10-09" };
-    assert.equal(record({ ...today, now: new Date(2026, 9, 9, 10, 0) }).status, "NOT_IN");
-    assert.equal(record({ ...today, now: new Date(2026, 9, 9, 17, 30) }).status, "ABSENT");
-    assert.equal(record({ dateKey: "2026-10-08", now: new Date(2026, 9, 9, 8, 0) }).status, "ABSENT");
-    assert.equal(record({ dateKey: "2026-10-12", now: new Date(2026, 9, 9, 8, 0) }).status, "NOT_IN");
-  });
-
-  test("weekends and days before the hire date are off, but a saved check-in still counts", () => {
-    assert.equal(record({ dateKey: SATURDAY }).status, "OFF");
-    assert.equal(record({ dateKey: "2023-12-01" }).status, "OFF");
-    assert.equal(record({ dateKey: SATURDAY, row: { checkIn: "10:00", checkOut: null } }).status, "LATE");
-  });
-
-  test("approved leave shows as on leave", () => {
-    const approvedLeave = [{ employeeId: 1, startDate: new Date("2026-10-05"), endDate: new Date("2026-10-07") }];
-    assert.equal(record({ dateKey: "2026-10-06", approvedLeave }).status, "ON_LEAVE");
-    assert.equal(record({ dateKey: "2026-10-08", approvedLeave }).status, "ABSENT");
+  test("day keys", () => {
+    assert.equal(isDateKey("2026-02-28"), true);
+    assert.equal(isDateKey("2026-02-30"), false);
+    assert.equal(isDateKey("2026-2-3"), false);
+    assert.equal(addDays("2026-02-28", 1), "2026-03-01");
+    assert.equal(isWeekend(SATURDAY), true);
+    assert.equal(isWeekend(TUESDAY), false);
   });
 });
 
-describe("manager: team attendance", () => {
-  test("shows only the team, with each person's status and the day's counts", async () => {
-    await checkIn(data.a1, MONDAY, "08:50", "17:05");
-    await checkIn(data.a2, MONDAY, "09:20");
-    await checkIn(data.b1, MONDAY, "08:00", "16:00");
+describe("attendance API", () => {
+  let data;
+  let managerA;
+  let managerB;
+  let hr;
 
-    const res = await request(app).get(`/api/manager/attendance?date=${MONDAY}`).set(managerA);
+  // Days inside the 7-day correction window. Any 6 days in a row include work days and a weekend day.
+  const today = todayKey();
+  const recent = [1, 2, 3, 4, 5, 6].map((i) => addDays(today, -i));
+  const [workday, otherWorkday] = recent.filter((day) => !isWeekend(day));
+  const weekendDay = recent.find((day) => isWeekend(day));
 
+  const correction = (overrides = {}) => ({
+    employeeId: data.a1.id,
+    date: workday,
+    checkIn: "09:00",
+    checkOut: "17:00",
+    reason: "Fingerprint machine was down",
+    ...overrides,
+  });
+
+  const requestCorrection = (headers, body) =>
+    request(app).post("/api/manager/attendance-corrections").set(headers).send(body);
+
+  const decide = (id, body) => request(app).patch(`/api/attendance-corrections/${id}`).set(hr).send(body);
+
+  const dayView = async (dateKey, headers = managerA) => {
+    const res = await request(app).get(`/api/manager/attendance?date=${dateKey}`).set(headers);
     assert.equal(res.status, 200);
-    assert.equal(res.body.date, MONDAY);
-    assert.deepEqual(res.body.rows.map((r) => [r.employee.employeeId, r.record.status]), [
-      ["A-1", "PRESENT"],
-      ["A-2", "LATE"],
-    ]);
-    assert.equal(res.body.rows[0].record.checkIn, "08:50");
-    assert.equal(res.body.rows[0].record.checkOut, "17:05");
-    assert.equal(res.body.rows[1].record.checkOut, null);
-    assert.equal(res.body.counts.PRESENT, 1);
-    assert.equal(res.body.counts.LATE, 1);
-    assert.equal(res.body.shift.start, "09:00");
+    return Object.fromEntries(res.body.rows.map((row) => [row.employee.employeeId, row.record]));
+  };
+
+  before(async () => {
+    data = await seedFixtures();
+    managerA = await login("manager.a@example.com");
+    managerB = await login("manager.b@example.com");
+    hr = await login("hr@example.com");
+
+    await checkIn(data.a1.id, TUESDAY, "09:20", "17:10");
+    await checkIn(data.b1.id, TUESDAY, "08:50", "17:00");
+    await approvedLeave(data.a2.id, "2026-03-11");
+  });
+  after(() => prisma.$disconnect());
+
+  describe("viewing a day", () => {
+    test("shows only the manager's team, with statuses and counts", async () => {
+      const res = await request(app).get(`/api/manager/attendance?date=${TUESDAY}`).set(managerA);
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.date, TUESDAY);
+      // The company's day comes along with every answer, whatever day is being viewed.
+      assert.equal(res.body.today, today);
+      assert.equal(res.body.workday, true);
+      assert.equal(res.body.shift.start, "09:00");
+      assert.deepEqual(
+        res.body.rows.map((row) => row.employee.employeeId),
+        ["A-1", "A-2"]
+      );
+
+      const [amir, ayesha] = res.body.rows.map((row) => row.record);
+      assert.deepEqual(
+        { status: amir.status, checkIn: amir.checkIn, checkOut: amir.checkOut },
+        { status: "LATE", checkIn: "09:20", checkOut: "17:10" }
+      );
+      assert.equal(ayesha.status, "ABSENT");
+      assert.equal(amir.correctable, false); // too long ago
+      assert.equal(res.body.counts.LATE, 1);
+      assert.equal(res.body.counts.ABSENT, 1);
+      assert.equal(res.body.counts.PRESENT, 0);
+    });
+
+    test("approved leave shows as on leave", async () => {
+      const records = await dayView("2026-03-11");
+      assert.equal(records["A-2"].status, "ON_LEAVE");
+    });
+
+    test("a weekend is not a work day", async () => {
+      const res = await request(app).get(`/api/manager/attendance?date=${SATURDAY}`).set(managerA);
+
+      assert.equal(res.body.workday, false);
+      assert.ok(res.body.rows.every((row) => row.record.status === "OFF"));
+      assert.equal(res.body.counts.OFF, 2);
+    });
+
+    test("defaults to today and refuses bad or future dates", async () => {
+      const res = await request(app).get("/api/manager/attendance").set(managerA);
+      assert.equal(res.status, 200);
+      // No date at all: the server uses its own day, so the app never has to guess it.
+      assert.equal(res.body.date, today);
+      assert.equal(res.body.today, today);
+
+      for (const date of ["abc", "2026-13-01", "2026-02-30", addDays(today, 1)]) {
+        const bad = await request(app).get(`/api/manager/attendance?date=${date}`).set(managerA);
+        assert.equal(bad.status, 400, date);
+      }
+    });
   });
 
-  test("a past weekday with no check-in is absent, a weekend is off", async () => {
-    const absent = await request(app).get(`/api/manager/attendance?date=${TUESDAY_AFTER}`).set(managerA);
-    assert.deepEqual(absent.body.rows.map((r) => r.record.status), ["ABSENT", "ABSENT"]);
-    assert.equal(absent.body.counts.ABSENT, 2);
+  describe("a member's history", () => {
+    test("returns the last 7 days, newest first", async () => {
+      const res = await request(app).get(`/api/manager/team/${data.a1.id}/attendance`).set(managerA);
 
-    const weekend = await request(app).get(`/api/manager/attendance?date=${SATURDAY}`).set(managerA);
-    assert.deepEqual(weekend.body.rows.map((r) => r.record.status), ["OFF", "OFF"]);
+      assert.equal(res.status, 200);
+      assert.equal(res.body.today, today);
+      assert.equal(res.body.records.length, 7);
+      assert.equal(res.body.records[0].date, today);
+      assert.equal(res.body.records[6].date, addDays(today, -6));
+    });
+
+    test("checks days and the team", async () => {
+      const url = `/api/manager/team/${data.a1.id}/attendance`;
+      assert.equal((await request(app).get(`${url}?days=31`).set(managerA)).body.records.length, 31);
+
+      for (const days of ["0", "32", "abc", "1.5"]) {
+        assert.equal((await request(app).get(`${url}?days=${days}`).set(managerA)).status, 400, days);
+      }
+
+      const other = await request(app).get(`/api/manager/team/${data.b1.id}/attendance`).set(managerA);
+      assert.equal(other.status, 404);
+    });
   });
 
-  test("approved leave shows as on leave", async () => {
-    const res = await request(app).get(`/api/manager/attendance?date=${LEAVE_DAY}`).set(managerA);
-    const a1 = res.body.rows.find((r) => r.employee.employeeId === "A-1");
+  describe("correction requests", () => {
+    let amirCorrection;
 
-    assert.equal(a1.record.status, "ON_LEAVE");
+    test("a manager can ask HR to fix a recent day", async () => {
+      await checkIn(data.a1.id, workday, "09:40", "17:30");
+
+      const res = await requestCorrection(managerA, correction());
+
+      assert.equal(res.status, 201);
+      amirCorrection = res.body.correction;
+      assert.equal(amirCorrection.status, "PENDING");
+      assert.equal(amirCorrection.employeeId, "A-1");
+      assert.equal(amirCorrection.requestedBy, "Alice Test");
+      assert.deepEqual(amirCorrection.requested, { checkIn: "09:00", checkOut: "17:00" });
+      assert.deepEqual(amirCorrection.before, { checkIn: "09:40", checkOut: "17:30" });
+
+      // Nothing changes until HR approves, and the day shows the waiting request.
+      const records = await dayView(workday);
+      assert.equal(records["A-1"].checkIn, "09:40");
+      assert.equal(records["A-1"].status, "LATE");
+      assert.deepEqual(records["A-1"].correction, { id: amirCorrection.id, status: "PENDING" });
+      assert.equal(records["A-1"].correctable, false);
+      assert.equal(records["A-2"].correctable, true);
+    });
+
+    test("only one request per day can wait for HR", async () => {
+      const res = await requestCorrection(managerA, correction({ checkIn: "08:55" }));
+      assert.equal(res.status, 409);
+    });
+
+    test("can't ask for another team's member", async () => {
+      const res = await requestCorrection(managerA, correction({ employeeId: data.b1.id }));
+      assert.equal(res.status, 404);
+    });
+
+    test("only work days in the last 7 days, not on leave", async () => {
+      const tooOld = await requestCorrection(managerA, correction({ date: addDays(today, -7) }));
+      assert.equal(tooOld.status, 400);
+      assert.match(tooOld.body.message, /last 7 days/);
+
+      assert.equal((await requestCorrection(managerA, correction({ date: addDays(today, 1) }))).status, 400);
+      assert.equal((await requestCorrection(managerA, correction({ date: weekendDay }))).status, 400);
+
+      // Times later than now, checked with a fixed clock (noon) so this passes at any hour.
+      const later = { employeeId: data.a1.id, date: workday, checkIn: "13:00", checkOut: "14:00", reason: "Typo" };
+      await assert.rejects(attendanceService.requestCorrection(data.managerA.id, later, at(workday, "12:00")), {
+        statusCode: 400,
+        message: /later than now/,
+      });
+
+      await approvedLeave(data.a1.id, otherWorkday);
+      const onLeave = await requestCorrection(managerA, correction({ date: otherWorkday }));
+      assert.equal(onLeave.status, 409);
+    });
+
+    test("validates the request", async () => {
+      const bodies = [
+        correction({ checkIn: "09:00", checkOut: "08:00" }),
+        correction({ checkIn: "9:00" }),
+        correction({ checkIn: "24:00" }),
+        correction({ reason: "  " }),
+        correction({ reason: undefined }),
+        correction({ date: "2026-02-30" }),
+        correction({ employeeId: "1" }),
+      ];
+
+      for (const body of bodies) {
+        assert.equal((await requestCorrection(managerA, body)).status, 422, JSON.stringify(body));
+      }
+    });
+
+    test("a manager lists only their team's requests", async () => {
+      const mine = await request(app).get("/api/manager/attendance-corrections").set(managerA);
+      assert.equal(mine.status, 200);
+      assert.deepEqual(
+        mine.body.corrections.map((c) => c.id),
+        [amirCorrection.id]
+      );
+
+      const theirs = await request(app).get("/api/manager/attendance-corrections").set(managerB);
+      assert.deepEqual(theirs.body.corrections, []);
+
+      assert.equal((await request(app).get("/api/manager/attendance-corrections?status=NOPE").set(managerA)).status, 400);
+    });
   });
 
-  test("defaults to today, and rejects a bad date", async () => {
-    const res = await request(app).get("/api/manager/attendance").set(managerA);
-    assert.equal(res.status, 200);
-    assert.equal(res.body.date, localDateKey(new Date()));
+  describe("HR decisions", () => {
+    let amirId;
+    let bilalId;
 
-    assert.equal((await request(app).get("/api/manager/attendance?date=2026-02-31").set(managerA)).status, 400);
-    assert.equal((await request(app).get("/api/manager/attendance?date=yesterday").set(managerA)).status, 400);
-  });
-});
+    before(async () => {
+      const bilal = await requestCorrection(managerB, correction({ employeeId: data.b1.id, checkOut: null }));
+      assert.equal(bilal.status, 201);
+      bilalId = bilal.body.correction.id;
 
-describe("manager: one member's attendance", () => {
-  test("lists the last days, newest first", async () => {
-    const res = await request(app).get(`/api/manager/team/${data.a1.id}/attendance?days=3`).set(managerA);
+      const pending = await request(app).get("/api/attendance-corrections?status=PENDING").set(hr);
+      amirId = pending.body.corrections.find((c) => c.employeeId === "A-1").id;
+    });
 
-    assert.equal(res.status, 200);
-    assert.equal(res.body.attendance.length, 3);
-    assert.equal(res.body.attendance[0].date, localDateKey(new Date()));
-    assert.ok(res.body.attendance[0].date > res.body.attendance[2].date);
-  });
+    test("HR sees every team's waiting requests", async () => {
+      const res = await request(app).get("/api/attendance-corrections?status=PENDING").set(hr);
 
-  test("uses 7 days by default and refuses silly values", async () => {
-    const res = await request(app).get(`/api/manager/team/${data.a1.id}/attendance`).set(managerA);
-    assert.equal(res.body.attendance.length, 7);
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body.corrections.map((c) => c.employeeId).sort(), ["A-1", "B-1"]);
+    });
 
-    for (const days of ["0", "32", "abc", "1.5"]) {
-      assert.equal((await request(app).get(`/api/manager/team/${data.a1.id}/attendance?days=${days}`).set(managerA)).status, 400);
-    }
-  });
+    test("approving changes the record and keeps the old times", async () => {
+      const res = await decide(amirId, { status: "APPROVED", note: "Checked with security" });
 
-  test("another team's member is not found", async () => {
-    assert.equal((await request(app).get(`/api/manager/team/${data.b1.id}/attendance`).set(managerA)).status, 404);
-  });
-});
+      assert.equal(res.status, 200);
+      assert.equal(res.body.correction.status, "APPROVED");
+      assert.equal(res.body.correction.decidedBy, "hr");
+      assert.equal(res.body.correction.decisionNote, "Checked with security");
+      assert.deepEqual(res.body.correction.before, { checkIn: "09:40", checkOut: "17:30" });
 
-describe("HR admin: recording attendance", () => {
-  const put = (body) => request(app).put("/api/attendance").set(hr).send(body);
+      const stored = await prisma.attendanceCorrection.findUnique({ where: { id: amirId } });
+      assert.equal(stored.decidedById, (await prisma.admin.findUnique({ where: { email: "hr@example.com" } })).id);
 
-  test("saves a check-in, then corrects it without making a second row", async () => {
-    const first = await put({ employeeId: data.a1.id, date: MONDAY, checkIn: "09:30" });
-    assert.equal(first.status, 200);
-    assert.equal(first.body.record.status, "LATE");
+      const records = await dayView(workday);
+      assert.equal(records["A-1"].checkIn, "09:00");
+      assert.equal(records["A-1"].checkOut, "17:00");
+      assert.equal(records["A-1"].status, "PRESENT");
+      assert.deepEqual(records["A-1"].correction, { id: amirId, status: "APPROVED" });
+      assert.equal(records["A-1"].correctable, true);
+    });
 
-    const fixed = await put({ employeeId: data.a1.id, date: MONDAY, checkIn: "08:55", checkOut: "17:10" });
-    assert.equal(fixed.body.record.status, "PRESENT");
-    assert.equal(fixed.body.record.checkOut, "17:10");
-    assert.equal(await prisma.attendance.count({ where: { employeeId: data.a1.id } }), 1);
-  });
+    test("a request is decided only once", async () => {
+      assert.equal((await decide(amirId, { status: "REJECTED" })).status, 409);
+    });
 
-  test("lists everyone for a day", async () => {
-    await put({ employeeId: data.b1.id, date: MONDAY, checkIn: "08:40" });
+    test("rejecting leaves the record as it was", async () => {
+      const res = await decide(bilalId, { status: "REJECTED", note: "No proof" });
 
-    const res = await request(app).get(`/api/attendance?date=${MONDAY}`).set(hr);
+      assert.equal(res.status, 200);
+      assert.equal(res.body.correction.status, "REJECTED");
+      const record = await prisma.attendance.findUnique({
+        where: { employeeId_date: { employeeId: data.b1.id, date: asDbDate(workday) } },
+      });
+      assert.equal(record, null);
+    });
 
-    assert.equal(res.status, 200);
-    const b1 = res.body.rows.find((r) => r.employee.employeeId === "B-1");
-    assert.equal(b1.record.status, "PRESENT");
-    assert.ok(res.body.rows.length >= 5);
-  });
+    test("without a check-out, approving keeps the recorded one", async () => {
+      await checkIn(data.a2.id, workday, "10:00", "17:30");
+      const sent = await requestCorrection(managerA, correction({ employeeId: data.a2.id, checkOut: undefined }));
+      assert.equal(sent.status, 201);
 
-  test("rejects bad input", async () => {
-    assert.equal((await put({ employeeId: data.a1.id, date: MONDAY, checkIn: "9:30" })).status, 422);
-    assert.equal((await put({ employeeId: data.a1.id, date: MONDAY, checkIn: "25:00" })).status, 422);
-    assert.equal((await put({ employeeId: data.a1.id, date: MONDAY, checkIn: "10:00", checkOut: "09:00" })).status, 422);
-    assert.equal((await put({ employeeId: data.a1.id, date: "2026-02-31", checkIn: "09:00" })).status, 422);
-    assert.equal((await put({ date: MONDAY, checkIn: "09:00" })).status, 422);
-  });
+      await decide(sent.body.correction.id, { status: "APPROVED" });
 
-  test("won't record the future, a day before the hire date, or an unknown employee", async () => {
-    assert.equal((await put({ employeeId: data.a1.id, date: "2999-01-01", checkIn: "09:00" })).status, 400);
-    assert.equal((await put({ employeeId: data.a1.id, date: "2023-12-01", checkIn: "09:00" })).status, 400);
-    assert.equal((await put({ employeeId: 999999, date: MONDAY, checkIn: "09:00" })).status, 404);
-  });
+      const records = await dayView(workday);
+      assert.equal(records["A-2"].checkIn, "09:00");
+      assert.equal(records["A-2"].checkOut, "17:30");
+    });
 
-  test("removes a record, and says so when there is none", async () => {
-    await put({ employeeId: data.a1.id, date: MONDAY, checkIn: "09:00" });
-
-    assert.equal((await request(app).delete(`/api/attendance/${data.a1.id}/${MONDAY}`).set(hr)).status, 200);
-    assert.equal(await prisma.attendance.count(), 0);
-    assert.equal((await request(app).delete(`/api/attendance/${data.a1.id}/${MONDAY}`).set(hr)).status, 404);
-    assert.equal((await request(app).delete(`/api/attendance/${data.a1.id}/nope`).set(hr)).status, 400);
-  });
-});
-
-describe("who may use it", () => {
-  test("managers cannot record or read everyone's attendance", async () => {
-    const body = { employeeId: data.a1.id, date: MONDAY, checkIn: "09:00" };
-
-    assert.equal((await request(app).put("/api/attendance").set(managerA).send(body)).status, 403);
-    assert.equal((await request(app).get("/api/attendance").set(managerA)).status, 403);
-    assert.equal((await request(app).delete(`/api/attendance/${data.a1.id}/${MONDAY}`).set(managerA)).status, 403);
+    test("checks the id and the decision", async () => {
+      assert.equal((await decide(99999, { status: "APPROVED" })).status, 404);
+      assert.equal((await decide("abc", { status: "APPROVED" })).status, 400);
+      assert.equal((await decide(amirId, { status: "MAYBE" })).status, 422);
+    });
   });
 
-  test("HR admins have no team, so the manager endpoints refuse them", async () => {
-    assert.equal((await request(app).get("/api/manager/attendance").set(hr)).status, 403);
+  test("can't correct a day before the employee was hired", async () => {
+    const newcomer = await prisma.employee.create({
+      data: {
+        employeeId: "A-3",
+        firstName: "Asad",
+        lastName: "Test",
+        email: "a-3@example.com",
+        hireDate: asDbDate(today),
+        managerId: data.managerA.id,
+      },
+    });
+
+    const res = await requestCorrection(managerA, correction({ employeeId: newcomer.id }));
+    assert.equal(res.status, 400);
+    assert.match(res.body.message, /before the employee was hired/);
   });
 
-  test("everything needs a login", async () => {
-    assert.equal((await request(app).get("/api/attendance")).status, 401);
-    assert.equal((await request(app).get("/api/manager/attendance")).status, 401);
-    assert.equal((await request(app).get(`/api/manager/team/${data.a1.id}/attendance`)).status, 401);
+  test("someone who isn't active shows as inactive, isn't counted and can't be corrected", async () => {
+    const leaver = await prisma.employee.create({
+      data: {
+        employeeId: "A-4",
+        firstName: "Asma",
+        lastName: "Test",
+        email: "a-4@example.com",
+        hireDate: asDbDate("2024-01-15"),
+        status: "inactive",
+        managerId: data.managerA.id,
+      },
+    });
+
+    const res = await request(app).get(`/api/manager/attendance?date=${workday}`).set(managerA);
+    const record = res.body.rows.find((row) => row.employee.id === leaver.id).record;
+    assert.equal(record.status, "INACTIVE");
+    assert.equal(record.correctable, false);
+    assert.equal(res.body.counts.INACTIVE, 1);
+    assert.equal(res.body.counts.ABSENT + res.body.counts.NOT_IN, 0);
+
+    const refused = await requestCorrection(managerA, correction({ employeeId: leaver.id }));
+    assert.equal(refused.status, 409);
+    assert.match(refused.body.message, /isn't active/);
   });
 });

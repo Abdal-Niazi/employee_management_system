@@ -71,4 +71,8 @@ describe("login rate limit", () => {
     // Even the right password is refused until the window passes.
     assert.equal((await signIn("hr@example.com", PASSWORD)).status, 429);
   });
+
+  test("only that account is blocked, not everyone on the same address (an office Wi-Fi)", async () => {
+    assert.equal((await signIn("manager.a@example.com", PASSWORD)).status, 200);
+  });
 });
