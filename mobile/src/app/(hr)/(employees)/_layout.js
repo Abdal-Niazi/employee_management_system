@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useRouter } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
-import SignOutButton from "../../../components/SignOutButton";
+import AccountButtons from "../../../components/AccountButtons";
 import { colors, spacing } from "../../../theme";
 
 function HeaderButtons() {
@@ -17,7 +17,7 @@ function HeaderButtons() {
       >
         <Ionicons name="person-add-outline" size={22} color={colors.primary} />
       </Pressable>
-      <SignOutButton />
+      <AccountButtons />
     </View>
   );
 }

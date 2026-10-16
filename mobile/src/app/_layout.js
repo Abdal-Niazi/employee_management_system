@@ -54,6 +54,15 @@ function RootNavigator() {
       <Stack.Protected guard={Boolean(user) && !isManager && !isHrAdmin && !isEmployee}>
         <Stack.Screen name="coming-soon" />
       </Stack.Protected>
+
+      {/* Every signed-in account, opened from the key icon in the header. Last, so signing in
+          never lands here first. */}
+      <Stack.Protected guard={Boolean(user)}>
+        <Stack.Screen
+          name="change-password"
+          options={{ headerShown: true, title: "Change password", headerBackTitle: "Back" }}
+        />
+      </Stack.Protected>
     </Stack>
   );
 }
