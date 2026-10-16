@@ -5,6 +5,7 @@ import { formatRange, timeAgo } from "../utils/date";
 import { statusInfo } from "../utils/status";
 import Button from "./Button";
 import Card from "./Card";
+import { totalDays } from "./LeaveBalance";
 import StatusPill from "./StatusPill";
 
 export function leaveSummary(request) {
@@ -14,9 +15,12 @@ export function leaveSummary(request) {
 
 // What the person has left of this kind of leave in the year it starts in. The request's own days are
 // already held back, so this is what is left if it is approved.
-function balanceNote({ type, year, entitlement, remaining }) {
-  if (remaining === 0) return `No ${type} days left in ${year} after this request (of ${entitlement})`;
-  return `${type} balance ${year}: ${remaining} of ${entitlement} days left after this request`;
+function balanceNote(balance) {
+  const { type, year, remaining } = balance;
+  const total = totalDays(balance);
+  const carried = balance.carriedOver > 0 ? `, incl. ${balance.carriedOver} carried over` : "";
+  if (remaining === 0) return `No ${type} days left in ${year} after this request (of ${total}${carried})`;
+  return `${type} balance ${year}: ${remaining} of ${total} days left after this request${carried}`;
 }
 
 export default function LeaveCard({ request, onApprove, onReject, onCancel, showName = true, showManager = false }) {

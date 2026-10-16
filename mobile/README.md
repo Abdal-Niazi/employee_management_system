@@ -99,7 +99,7 @@ All calls go through `src/api/me.js` (`/api/me/...`, always the signed-in person
 |---|---|
 | Today tab, and the card on the manager's Overview | `GET /api/me/attendance/today`, `POST /api/me/device`, `POST /api/me/attendance/check-in`, `POST /api/me/attendance/check-out` |
 | My attendance (7 / 14 / 30 days) | `GET /api/me/attendance?days=` |
-| My leave: days left this year, request, track, cancel a pending one | `GET /api/me/leave-requests`, `GET /api/me/leave-balance`, `POST /api/me/leave-requests`, `DELETE /api/me/leave-requests/:id` |
+| My leave: days left this year (with the days carried over from last year), request, track, cancel a pending one | `GET /api/me/leave-requests`, `GET /api/me/leave-balance`, `POST /api/me/leave-requests`, `DELETE /api/me/leave-requests/:id` |
 | My profile, and who they report to | `GET /api/me` |
 
 `CheckInCard` shows **Check in**, then **Check out** (which asks once more, since a check-out can't

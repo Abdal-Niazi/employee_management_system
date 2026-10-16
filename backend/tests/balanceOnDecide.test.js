@@ -36,6 +36,7 @@ describe("a manager deciding leave", () => {
       year: 2026,
       type: "Annual",
       entitlement: 14,
+      carriedOver: 0,
       used: 3,
       pending: 3,
       remaining: 8,

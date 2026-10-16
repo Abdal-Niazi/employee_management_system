@@ -63,8 +63,9 @@ export async function getMyLeave() {
   return { today, leaveRequests };
 }
 
-// GET /api/me/leave-balance?year= -> { year, balances: [{ type, entitlement, used, pending, remaining }] }
-// (no year = this year). Days waiting for a decision are already taken out of `remaining`.
+// GET /api/me/leave-balance?year= -> { year, balances: [{ type, entitlement, carriedOver, used, pending, remaining }] }
+// (no year = this year). `carriedOver` is annual leave moved in from the year before (0 for the other
+// kinds); `remaining` = entitlement + carriedOver - used - pending, so waiting days are already taken out.
 export async function getMyLeaveBalance(year) {
   const query = year ? `?year=${encodeURIComponent(year)}` : "";
   const { year: shown, balances } = await request(`/api/me/leave-balance${query}`);
