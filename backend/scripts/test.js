@@ -41,6 +41,8 @@ const env = {
   SHIFT_END: "17:00",
   LATE_GRACE_MINUTES: "5",
   COMPANY_TIMEZONE: "Asia/Karachi",
+  // The leave balance tests count a plain year; tests/carryOver.test.js turns carry-over on for itself.
+  LEAVE_CARRY_OVER_DAYS: "0",
 };
 
 const run = (args) => spawnSync(process.execPath, args, { env, stdio: "inherit", cwd: path.join(__dirname, "..") });

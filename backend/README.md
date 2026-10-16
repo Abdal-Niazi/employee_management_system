@@ -183,10 +183,21 @@ Everyone gets the same working days of leave per calendar year, set in `.env`:
 towards the year its first day falls in, only Monday to Friday days are counted, and it is refused
 with a 409 if it needs more days than are left of that kind. Approved days are used up and days
 waiting for a decision are held back, so asking twice can't get past the limit; rejected and
-cancelled requests give their days back. `GET /api/me/leave-balance?year=` shows the numbers.
-Nothing carries over to the next year. The leave lists managers and HR admins decide from carry a
-`balance` on every pending request (what is left of that kind in the year it starts in, with the
-request's own days already held back), and `balance: null` on decided ones.
+cancelled requests give their days back. `GET /api/me/leave-balance?year=` shows the numbers: per
+kind of leave its `entitlement`, `carriedOver`, `used`, `pending` and `remaining`
+(`entitlement + carriedOver - used - pending`, never below 0).
+
+**Carry-over:** annual days nobody took in a year move into the next one, up to
+`LEAVE_CARRY_OVER_DAYS` (default 5; 0 turns it off). Days waiting for a decision count as taken, and
+rejected or cancelled requests don't. Carried days carry on, but never more than the limit a year, so
+a person never has more than the yearly days plus the limit. Sick and casual days never carry over.
+Nothing carries into the year a person was hired, and the first year that gets carried days is
+`LEAVE_CARRY_OVER_FIRST_YEAR` (default 2027), so balances of earlier years stay as they were. The
+numbers come from the requests, nothing is stored: change a setting and every year follows.
+
+The leave lists managers and HR admins decide from carry a `balance` on every pending request (what
+is left of that kind in the year it starts in, carried days included, with the request's own days
+already held back), and `balance: null` on decided ones.
 
 ## Tests
 

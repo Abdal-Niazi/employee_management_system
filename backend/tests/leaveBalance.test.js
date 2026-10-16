@@ -48,9 +48,9 @@ describe("the balance", () => {
   test("counts approved and waiting days separately and subtracts both", async () => {
     const balance = await balanceOf(amir);
 
-    assert.deepEqual(balance.Annual, { type: "Annual", entitlement: 14, used: 3, pending: 3, remaining: 8 });
-    assert.deepEqual(balance.Sick, { type: "Sick", entitlement: 8, used: 0, pending: 0, remaining: 8 });
-    assert.deepEqual(balance.Casual, { type: "Casual", entitlement: 6, used: 0, pending: 0, remaining: 6 });
+    assert.deepEqual(balance.Annual, { type: "Annual", entitlement: 14, carriedOver: 0, used: 3, pending: 3, remaining: 8 });
+    assert.deepEqual(balance.Sick, { type: "Sick", entitlement: 8, carriedOver: 0, used: 0, pending: 0, remaining: 8 });
+    assert.deepEqual(balance.Casual, { type: "Casual", entitlement: 6, carriedOver: 0, used: 0, pending: 0, remaining: 6 });
   });
 
   test("is per person and per year", async () => {
