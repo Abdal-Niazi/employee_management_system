@@ -11,14 +11,7 @@ const MIN_LENGTH = 8;
 // bcrypt only uses the first 72 bytes, so the server refuses longer passwords.
 const MAX_BYTES = 72;
 // The text's size in UTF-8, as the server counts it (accented letters and emoji take 2 to 4 bytes).
-const byteLength = (text) => {
-  let bytes = 0;
-  for (const char of text) {
-    const code = char.codePointAt(0);
-    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
-  }
-  return bytes;
-};
+const byteLength = (text) => new TextEncoder().encode(text).length;
 
 // A password box with a show/hide eye.
 function PasswordField({ label, value, onChangeText, autoComplete, onSubmitEditing, returnKeyType }) {
@@ -64,7 +57,8 @@ export default function ChangePasswordScreen() {
   const [repeat, setRepeat] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
+  // null until the change worked, then whether this phone could save its new sign-in.
+  const [done, setDone] = useState(null);
   // Set at once (state only after the next render), so a double tap, or Enter and a tap, sends
   // the change only once.
   const sending = useRef(false);
@@ -86,8 +80,12 @@ export default function ChangePasswordScreen() {
     sending.current = true;
     setSaving(true);
     try {
-      await changePassword(current, next);
-      setDone(true);
+      const { saved } = await changePassword(current, next);
+      // The passwords aren't needed any more.
+      setCurrent("");
+      setNext("");
+      setRepeat("");
+      setDone({ saved });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -103,7 +101,9 @@ export default function ChangePasswordScreen() {
           <View style={styles.success}>
             <Ionicons name="checkmark-circle" size={28} color={colors.success} />
             <Text style={[font.body, styles.flex]}>
-              Password changed. You were signed out on your other phones and browsers; this one stays signed in.
+              {done.saved
+                ? "Password changed. You were signed out on your other phones and browsers; this one stays signed in."
+                : "Password changed, and you were signed out on your other phones and browsers. This phone couldn't save the new sign-in, so you'll need to sign in again the next time you open the app."}
             </Text>
           </View>
         </Card>

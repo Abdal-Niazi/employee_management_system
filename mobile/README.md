@@ -51,7 +51,8 @@ screen with **Retry**.
 have a button on their Profile tab). It opens `change-password.js`: the current password, the new
 one twice, each with a show/hide eye. The app checks the length and that both match, then calls
 `POST /api/auth/change-password`. The answer's new token replaces the saved one, so this phone stays
-signed in, while the account's other phones and browsers are signed out.
+signed in, while the account's other phones and browsers are signed out. If the phone can't save the new
+token, it removes the old (now ended) one and says the next app start will ask to sign in.
 
 "Today" always comes from the server (`today` in the answers), never from the phone's clock: the
 company day is Asia/Karachi, and a phone set to another timezone would otherwise ask for the wrong
