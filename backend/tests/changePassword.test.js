@@ -2,6 +2,7 @@ const { after, before, describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const jwt = require("jsonwebtoken");
 const { app, prisma, request, seedFixtures, login, account, PASSWORD } = require("./helpers");
+const { signToken } = require("../src/services/authService");
 
 // Each test uses its own account: failed attempts count per account (5 in tests, LOGIN_RATE_LIMIT).
 let data;
@@ -9,6 +10,7 @@ let data;
 before(async () => {
   data = await seedFixtures();
   await account("employee.b1@example.com", "EMPLOYEE", data.b1.id);
+  await account("employee.a2@example.com", "EMPLOYEE", data.a2.id);
 });
 after(() => prisma.$disconnect());
 
@@ -32,7 +34,7 @@ describe("changing your own password", () => {
     assert.equal((await me(auth)).status, 200);
   });
 
-  test("checks the new password", async () => {
+  test("checks the new password, and these mistakes don't use up the attempts", async () => {
     const auth = await login("employee.a1@example.com");
     const bodies = [
       { currentPassword: PASSWORD, newPassword: "short" },
@@ -41,18 +43,26 @@ describe("changing your own password", () => {
       { newPassword: "A-new-password-1" },
     ];
 
-    for (const body of bodies) {
+    // Twice over: 8 mistakes, more than the 5 failed attempts allowed
+    for (const body of [...bodies, ...bodies]) {
       assert.equal((await change(auth, body)).status, 422, JSON.stringify(body));
     }
+
+    const res = await change(auth, { currentPassword: PASSWORD, newPassword: "A-new-password-1" });
+    assert.equal(res.status, 200);
   });
 
-  test("after 5 failed attempts the account is blocked for a while, even with the right password", async () => {
-    const auth = await login("employee.a1@example.com");
-    const res = await change(auth, { currentPassword: PASSWORD, newPassword: "A-new-password-1" });
+  test("after 5 wrong passwords the account is blocked for a while, even with the right password", async () => {
+    const auth = await login("employee.a2@example.com");
+    for (let i = 0; i < 5; i += 1) {
+      const res = await change(auth, { currentPassword: "not-my-password", newPassword: "A-new-password-1" });
+      assert.equal(res.status, 400);
+    }
 
+    const res = await change(auth, { currentPassword: PASSWORD, newPassword: "A-new-password-1" });
     assert.equal(res.status, 429);
     // Nothing changed
-    assert.equal((await signIn("employee.a1@example.com", PASSWORD)).status, 200);
+    assert.equal((await signIn("employee.a2@example.com", PASSWORD)).status, 200);
   });
 
   test("signs out every other login, keeps this one with a new token, and the new password works", async () => {
@@ -79,6 +89,10 @@ describe("changing your own password", () => {
       assert.equal(res.status, 200, email);
       assert.equal((await signIn(email, "Another-pass-22")).status, 200, email);
     }
+  });
+
+  test("a token is never made without the account's version", () => {
+    assert.throws(() => signToken({ id: 1 }), /tokenVersion/);
   });
 
   test("a login from before this update still works, until the password changes", async () => {

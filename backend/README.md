@@ -195,8 +195,8 @@ request's own days already held back), and `balance: null` on decided ones.
 account's own password (HR admins, managers and employees alike). The new one needs 8 or more
 characters, at most 72 bytes (bcrypt's limit), and must differ from the current one (422
 otherwise). A wrong current password is a **400**, not a 401, so an app doesn't sign out over a
-typo; failed attempts count per account like failed sign-ins (`LOGIN_RATE_LIMIT` per 15 minutes,
-then 429).
+typo. Wrong current passwords count per account like failed sign-ins (`LOGIN_RATE_LIMIT` per 15
+minutes, then 429); a new password that breaks the rules (422) doesn't use up the attempts.
 
 It answers `{ token, admin }`: **every other login of the account is signed out** (other phones,
 browsers, a token someone else got hold of), and this new token keeps the caller signed in. Each

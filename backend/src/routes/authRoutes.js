@@ -11,12 +11,13 @@ router.post("/login", validate(loginSchema), authController.login);
 
 router.get("/me", requireAuth, authController.me);
 
-// Any signed-in account (HR admin, manager or employee), for its own password only.
+// Any signed-in account (HR admin, manager or employee), for its own password only. Checked before
+// the limiter, so a too-short new password doesn't use up the attempts.
 router.post(
   "/change-password",
   requireAuth,
-  passwordChangeLimiter,
   validate(changePasswordSchema),
+  passwordChangeLimiter,
   authController.changePassword
 );
 

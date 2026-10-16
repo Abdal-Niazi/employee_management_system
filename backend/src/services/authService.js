@@ -15,12 +15,15 @@ const toPublicAdmin = ({ id, email, name, role, employeeId }) => ({ id, email, n
 const hashPassword = (password) => bcrypt.hash(password, BCRYPT_ROUNDS);
 
 // A login token. It carries the account's tokenVersion, so raising that (a password change) ends
-// every login made before.
-const signToken = (admin) =>
-  jwt.sign({ sub: String(admin.id), v: admin.tokenVersion }, process.env.JWT_SECRET, {
+// every login made before. Without it the token would count as version 0 and stop working after
+// the first password change, so it needs the whole account row.
+const signToken = (admin) => {
+  if (!Number.isInteger(admin.tokenVersion)) throw new Error("signToken needs the account's tokenVersion");
+  return jwt.sign({ sub: String(admin.id), v: admin.tokenVersion }, process.env.JWT_SECRET, {
     algorithm: "HS256",
     expiresIn: process.env.JWT_EXPIRES_IN || "8h",
   });
+};
 
 const login = async (email, password) => {
   const admin = await prisma.admin.findUnique({
@@ -84,6 +87,7 @@ const changePassword = async (adminId, { currentPassword, newPassword }) => {
 
 module.exports = {
   hashPassword,
+  signToken,
   login,
   getAdminFromToken,
   changePassword,
