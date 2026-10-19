@@ -1,17 +1,5 @@
 const deviceService = require("../services/deviceService");
-const employeeService = require("../services/employeeService");
-const AppError = require("../utils/AppError");
-const parseId = require("../utils/parseId");
-
-const findEmployee = async (req) => {
-  const employee = await employeeService.getEmployeeById(parseId(req.params.id, "Employee id"));
-
-  if (!employee) {
-    throw new AppError("Employee not found", 404);
-  }
-
-  return employee;
-};
+const findEmployee = require("../utils/requestEmployee");
 
 // HR: whether an employee has a registered phone, and when it was last used. The key never leaves.
 const getDevice = async (req, res) => {

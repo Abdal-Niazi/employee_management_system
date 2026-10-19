@@ -44,9 +44,11 @@ You need Node.js 20.19 or newer and PostgreSQL.
    npx expo start --clear          # scan the QR code with Expo Go, or press w for the browser
    ```
 
-3. Sign in as the HR admin, add some employees, then create manager and employee accounts with
-   `npm run create-admin` (it asks for the employee's ID, the code shown in the app such as
-   `EMP001`) and give employees a manager by editing them in the app.
+3. Sign in as the HR admin and add some employees. Open an employee and use **App login** to create
+   their login (employee or manager): the app shows a temporary password once, you give it to the
+   person, and they choose their own when they first sign in. The same card resets a forgotten
+   password, turns a login off or on, and switches it between employee and manager. Give employees a
+   manager by editing them in the app.
 
 ## Day to day
 

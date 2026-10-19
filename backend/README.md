@@ -14,10 +14,12 @@ npm run seed                  # optional: sample leave requests and six weeks of
 npm start                     # http://localhost:5000
 ```
 
-`create-admin` asks for a role. A `MANAGER` or `EMPLOYEE` account also needs the **employee ID**
-(the code shown in the app, such as `EMP001`) of the employee it belongs to. A manager then sees
-the employees whose `managerId` is that employee, and HR sets that by editing an employee; an
-employee account checks that employee in and out. One account per employee.
+`create-admin` asks for a role. Use it for the **first HR admin**; after that HR creates the logins
+of employees in the app (see "Logins for employees" below). A `MANAGER` or `EMPLOYEE` account
+belongs to one employee, and the script also takes it by that employee's **employee ID** (the code
+shown in the app, such as `EMP001`). A manager then sees the employees whose `managerId` is that
+employee, and HR sets that by editing an employee; an employee account checks that employee in and
+out. One account per employee.
 
 ## Who can do what
 
@@ -25,7 +27,7 @@ employee account checks that employee in and out. One account per employee.
 |---|---|
 | `POST /api/auth/login`, `GET /api/auth/me` | anyone / any signed-in account |
 | `POST /api/auth/change-password` | any signed-in account, for its own password (see below) |
-| `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET /:id/device`, `POST /:id/device/approve` and `DELETE /:id/device` for the check-in phone) | `HR_ADMIN` |
+| `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET /:id/device`, `POST /:id/device/approve` and `DELETE /:id/device` for the check-in phone; `GET`, `POST`, `PATCH /:id/account` and `POST /:id/account/reset-password` for the person's login) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
 | `/api/attendance` (everyone's day; write, fix or remove a check-in) | `HR_ADMIN` |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
@@ -199,6 +201,28 @@ numbers come from the requests, nothing is stored: change a setting and every ye
 The leave lists managers and HR admins decide from carry a `balance` on every pending request (what
 is left of that kind in the year it starts in, carried days included, with the request's own days
 already held back), and `balance: null` on decided ones.
+
+## Logins for employees
+
+HR creates and looks after the logins (accounts) of employees, so nobody needs the command line:
+
+| Route | What it does |
+|---|---|
+| `GET /api/employees/:id/account` | The login, or `account: null` when there is none. Never any password. |
+| `POST /api/employees/:id/account` with `{ role, email? }` | Creates it. `role` is `EMPLOYEE` or `MANAGER`; the email defaults to the employee's own. Not for an employee who isn't `active`; 409 if they have a login already or the email is taken. |
+| `POST /api/employees/:id/account/reset-password` | For a forgotten password. |
+| `PATCH /api/employees/:id/account` with `{ role? , disabled? }` | Switches between `EMPLOYEE` and `MANAGER`, and/or turns the login off (`true`) or on (`false`). |
+
+Creating and resetting answer with a **`temporaryPassword`** (like `Kx7m-Qp3n-Rw9t`) that is shown
+**once** in that answer: only its hash is stored, so it can't be looked up again. The account has
+`mustChangePassword: true` until the person chooses their own: until then every route except
+`GET /api/auth/me` and `POST /api/auth/change-password` answers 403 "Choose your own password
+first", and changing the password clears the flag. A reset, a role change and turning a login off or
+on each sign out every login the person had (they raise `tokenVersion`, see below). A turned-off login
+gets a 403 at sign-in (only if the password is right, so it doesn't reveal which emails have a login)
+and its tokens stop working at once. HR admin accounts are not reached by these routes. A manager who
+is made an employee keeps the people who report to them, but only HR can decide that team's leave
+until HR changes it.
 
 ## Changing a password
 

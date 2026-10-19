@@ -54,6 +54,15 @@ one twice, each with a show/hide eye. The app checks the length and that both ma
 signed in, while the account's other phones and browsers are signed out. If the phone can't save the new
 token, it removes the old (now ended) one and says the next app start will ask to sign in.
 
+**Logins (HR).** An employee's page has an **App login** card above **Check-in phone**. With no login
+it offers **Create login** (the email starts as the employee's own, and a role of Employee or
+Manager); with one it shows the email, the role and whether the person has chosen their own password
+yet, and offers **Reset password**, **Make manager / Make employee** and **Turn login off / on**, each
+after a confirmation. Creating and resetting show the **temporary password once** (it can be selected
+and copied, and the server keeps only a hash). A person who signs in with a temporary password gets
+only the change-password screen (the root navigator shows nothing else while `mustChangePassword`
+is true) and goes to their own screens after choosing a password.
+
 "Today" always comes from the server (`today` in the answers), never from the phone's clock: the
 company day is Asia/Karachi, and a phone set to another timezone would otherwise ask for the wrong
 day — or one the server sees as the future.

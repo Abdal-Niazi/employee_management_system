@@ -51,7 +51,10 @@ function PasswordField({ label, value, onChangeText, autoComplete, onSubmitEditi
 // logins (other phones and browsers); this one stays signed in with the new login it gets back.
 export default function ChangePasswordScreen() {
   const router = useRouter();
-  const { changePassword } = useAuth();
+  const { user, changePassword, logout } = useAuth();
+  // Opened because HR gave a temporary password (kept from the first render: it is gone once the
+  // new password is saved). There is no way back from here until they choose their own.
+  const [firstTime] = useState(Boolean(user?.mustChangePassword));
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [repeat, setRepeat] = useState("");
@@ -107,7 +110,7 @@ export default function ChangePasswordScreen() {
             </Text>
           </View>
         </Card>
-        <Button title="Done" onPress={() => router.back()} />
+        <Button title="Done" onPress={() => (firstTime ? router.replace("/") : router.back())} />
       </View>
     );
   }
@@ -115,6 +118,17 @@ export default function ChangePasswordScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {firstTime ? (
+          <Card>
+            <View style={styles.success}>
+              <Ionicons name="key-outline" size={24} color={colors.primary} />
+              <Text style={[font.body, styles.flex]}>
+                You signed in with a temporary password. Choose your own now to start using the app. The current
+                password is the temporary one HR gave you.
+              </Text>
+            </View>
+          </Card>
+        ) : null}
         <Card>
           <PasswordField
             label="Current password"
@@ -145,6 +159,8 @@ export default function ChangePasswordScreen() {
           <Text style={styles.hint}>Your other phones and browsers will be signed out.</Text>
           <Button title="Change password" icon="key-outline" loading={saving} onPress={handleSave} style={styles.submit} />
         </Card>
+        {/* The first time there is no header with a sign-out, and nothing to go back to */}
+        {firstTime ? <Button title="Sign out" variant="outline" onPress={logout} /> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
