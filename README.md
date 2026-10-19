@@ -17,7 +17,8 @@ approve their team's leave, and employees check in and out and ask for leave fro
 | **Employee** | Checks in and out from their registered phone (with a fingerprint), sees their profile and manager, their attendance and leave balance, and asks for or cancels leave |
 
 Manager and employee accounts each belong to one employee. Everyone signs in with an email and a
-password, and the server decides which screens they get from their role.
+password, and the server decides which screens they get from their role. Anyone can change their
+own password in the app (the key icon in the header), which signs them out on their other devices.
 
 ## Get it running
 

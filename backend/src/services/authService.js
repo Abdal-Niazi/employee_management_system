@@ -14,6 +14,17 @@ const toPublicAdmin = ({ id, email, name, role, employeeId }) => ({ id, email, n
 
 const hashPassword = (password) => bcrypt.hash(password, BCRYPT_ROUNDS);
 
+// A login token. It carries the account's tokenVersion, so raising that (a password change) ends
+// every login made before. Without it the token would count as version 0 and stop working after
+// the first password change, so it needs the whole account row.
+const signToken = (admin) => {
+  if (!Number.isInteger(admin.tokenVersion)) throw new Error("signToken needs the account's tokenVersion");
+  return jwt.sign({ sub: String(admin.id), v: admin.tokenVersion }, process.env.JWT_SECRET, {
+    algorithm: "HS256",
+    expiresIn: process.env.JWT_EXPIRES_IN || "8h",
+  });
+};
+
 const login = async (email, password) => {
   const admin = await prisma.admin.findUnique({
     where: { email },
@@ -25,12 +36,7 @@ const login = async (email, password) => {
     throw new AppError("Invalid email or password", 401);
   }
 
-  const token = jwt.sign({ sub: String(admin.id) }, process.env.JWT_SECRET, {
-    algorithm: "HS256",
-    expiresIn: process.env.JWT_EXPIRES_IN || "8h",
-  });
-
-  return { token, admin: toPublicAdmin(admin) };
+  return { token: signToken(admin), admin: toPublicAdmin(admin) };
 };
 
 // Returns the admin the token belongs to, or throws a 401.
@@ -47,15 +53,42 @@ const getAdminFromToken = async (token) => {
     where: { id: Number(payload.sub) },
   });
 
-  if (!admin) {
+  // Tokens from before versions existed carry none, which counts as 0 (no change yet).
+  if (!admin || (payload.v ?? 0) !== admin.tokenVersion) {
     throw new AppError("Invalid or expired token", 401);
   }
 
   return toPublicAdmin(admin);
 };
 
+// The signed-in account changes its own password. Every other login of the account ends, and
+// this one gets a new token back, so it stays signed in.
+const changePassword = async (adminId, { currentPassword, newPassword }) => {
+  const admin = await prisma.admin.findUnique({ where: { id: adminId } });
+
+  // Not 401: the app signs out on a 401, and a typo shouldn't do that.
+  if (!admin || !(await bcrypt.compare(currentPassword, admin.passwordHash))) {
+    throw new AppError("Your current password isn't right", 400);
+  }
+
+  // Only if the password is still the one just checked, so of two changes sent at once only one
+  // goes through (the other could otherwise undo it with its own new password).
+  const { count } = await prisma.admin.updateMany({
+    where: { id: adminId, passwordHash: admin.passwordHash },
+    data: { passwordHash: await hashPassword(newPassword), tokenVersion: { increment: 1 } },
+  });
+  if (count === 0) {
+    throw new AppError("Your password was just changed somewhere else. Sign in again with the new one.", 409);
+  }
+
+  const updated = await prisma.admin.findUnique({ where: { id: adminId } });
+  return { token: signToken(updated), admin: toPublicAdmin(updated) };
+};
+
 module.exports = {
   hashPassword,
+  signToken,
   login,
   getAdminFromToken,
+  changePassword,
 };

@@ -43,4 +43,14 @@ const addressLimiter = limiter(Number(process.env.IP_RATE_LIMIT) || 1000, 60 * 1
 const userKey = (req) => `user:${req.admin.id}`;
 const userLimiter = limiter(Number(process.env.API_RATE_LIMIT) || 300, 60 * 1000, { keyGenerator: userKey });
 
-module.exports = { loginLimiter, addressLimiter, userLimiter, ipKey, loginKey, userKey };
+// Wrong current passwords count per account like failed sign-ins, so a login someone else got
+// hold of can't be used to guess the password. Only those count (a 400): a new password that
+// fails the rules never reaches this limiter (the route checks it first).
+const passwordChangeLimiter = limiter(Number(process.env.LOGIN_RATE_LIMIT) || 10, 15 * 60 * 1000, {
+  skipSuccessfulRequests: true,
+  requestWasSuccessful: (req, res) => res.statusCode !== 400,
+  keyGenerator: userKey,
+  message: { message: "Too many failed attempts, please try again in 15 minutes" },
+});
+
+module.exports = { loginLimiter, addressLimiter, userLimiter, passwordChangeLimiter, ipKey, loginKey, userKey };

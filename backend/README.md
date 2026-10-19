@@ -24,6 +24,7 @@ employee account checks that employee in and out. One account per employee.
 | Route | Who |
 |---|---|
 | `POST /api/auth/login`, `GET /api/auth/me` | anyone / any signed-in account |
+| `POST /api/auth/change-password` | any signed-in account, for its own password (see below) |
 | `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET /:id/device`, `POST /:id/device/approve` and `DELETE /:id/device` for the check-in phone) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
 | `/api/attendance` (everyone's day; write, fix or remove a check-in) | `HR_ADMIN` |
@@ -198,6 +199,21 @@ numbers come from the requests, nothing is stored: change a setting and every ye
 The leave lists managers and HR admins decide from carry a `balance` on every pending request (what
 is left of that kind in the year it starts in, carried days included, with the request's own days
 already held back), and `balance: null` on decided ones.
+
+## Changing a password
+
+`POST /api/auth/change-password` with `{ currentPassword, newPassword }` changes the signed-in
+account's own password (HR admins, managers and employees alike). The new one needs 8 or more
+characters, at most 72 bytes (bcrypt's limit), and must differ from the current one (422
+otherwise). A wrong current password is a **400**, not a 401, so an app doesn't sign out over a
+typo. Wrong current passwords count per account like failed sign-ins (`LOGIN_RATE_LIMIT` per 15
+minutes, then 429); a new password that breaks the rules (422) doesn't use up the attempts.
+
+It answers `{ token, admin }`: **every other login of the account is signed out** (other phones,
+browsers, a token someone else got hold of), and this new token keeps the caller signed in. Each
+token carries the account's `tokenVersion`; a password change raises it, and older tokens get a
+401. Tokens from before this existed carry none and count as 0. Of two changes sent at once only
+one goes through (409 for the other).
 
 ## Tests
 

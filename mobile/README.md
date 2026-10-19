@@ -47,6 +47,13 @@ on web, so a reload signs you out) and sent as a Bearer token. A 401 signs you o
 can't be reached when the app starts, you stay signed in and get a "Can't connect to the server"
 screen with **Retry**.
 
+**Change password.** Every role has a key icon next to **Sign out** in the header (employees also
+have a button on their Profile tab). It opens `change-password.js`: the current password, the new
+one twice, each with a show/hide eye. The app checks the length and that both match, then calls
+`POST /api/auth/change-password`. The answer's new token replaces the saved one, so this phone stays
+signed in, while the account's other phones and browsers are signed out. If the phone can't save the new
+token, it removes the old (now ended) one and says the next app start will ask to sign in.
+
 "Today" always comes from the server (`today` in the answers), never from the phone's clock: the
 company day is Asia/Karachi, and a phone set to another timezone would otherwise ask for the wrong
 day — or one the server sees as the future.
@@ -140,6 +147,7 @@ src/app/                screens (Expo Router — every file is a route)
   corrections.js        the manager's attendance correction requests
   (employee)/           bottom tabs: Today, My attendance, Leave, Profile
   coming-soon.js        shown only for a role this version of the app doesn't know
+  change-password.js    any signed-in account: change your own password
 src/api/                client.js (fetch wrapper + Bearer token), auth.js, hr.js, manager.js, me.js
 src/components/         shared UI
 src/auth/               session (AuthContext), token storage, the phone key and the fingerprint prompt

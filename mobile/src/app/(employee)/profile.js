@@ -1,6 +1,8 @@
+import { useRouter } from "expo-router";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getMyProfile } from "../../api/me";
 import Avatar from "../../components/Avatar";
+import Button from "../../components/Button";
 import Card from "../../components/Card";
 import { ErrorState, LoadingState } from "../../components/States";
 import StatusPill from "../../components/StatusPill";
@@ -20,6 +22,7 @@ function DetailRow({ label, value }) {
 
 // The signed-in person's own record, as HR keeps it, and who they report to.
 export default function ProfileScreen() {
+  const router = useRouter();
   const { status, data: employee, error, reload, refresh, refreshing } = useAsync(getMyProfile);
 
   if (status === "loading") return <LoadingState />;
@@ -70,6 +73,13 @@ export default function ProfileScreen() {
           <Text style={font.small}>No manager assigned yet. Ask HR, since your leave requests go to your manager.</Text>
         )}
       </Card>
+
+      <Button
+        title="Change password"
+        icon="key-outline"
+        variant="outline"
+        onPress={() => router.push("/change-password")}
+      />
     </ScrollView>
   );
 }

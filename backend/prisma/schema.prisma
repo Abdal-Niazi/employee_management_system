@@ -129,6 +129,8 @@ model Admin {
   email               String                 @unique
   name                String
   passwordHash        String
+  // Goes up when the password changes; logins (tokens) made with an older value stop working
+  tokenVersion        Int                    @default(0)
   role                Role                   @default(HR_ADMIN)
   // For MANAGER and EMPLOYEE accounts: the employee they are (a manager's team hangs off it)
   employeeId          Int?                   @unique

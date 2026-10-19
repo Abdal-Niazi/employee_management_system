@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
-import SignOutButton from "../../components/SignOutButton";
+import AccountButtons from "../../components/AccountButtons";
 import { colors } from "../../theme";
 
 const ICONS = {
@@ -19,7 +19,7 @@ export default function EmployeeLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         headerTitleStyle: { fontWeight: "700" },
-        headerRight: () => <SignOutButton />,
+        headerRight: () => <AccountButtons />,
         tabBarIcon: ({ color, size, focused }) => (
           <Ionicons name={focused ? ICONS[route.name] : `${ICONS[route.name]}-outline`} size={size} color={color} />
         ),

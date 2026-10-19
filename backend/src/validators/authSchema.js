@@ -20,6 +20,13 @@ const loginSchema = z.object({
     .max(200, "password is too long"),
 });
 
+// A new password. bcrypt ignores everything after 72 bytes, so longer ones would be silently cut.
+const newPassword = (field) =>
+  z
+    .string({ error: `${field} is required` })
+    .min(8, `${field} must be at least 8 characters`)
+    .refine((value) => Buffer.byteLength(value, "utf8") <= 72, `${field} must be at most 72 bytes`);
+
 const createAdminSchema = z
   .object({
     email,
@@ -35,11 +42,7 @@ const createAdminSchema = z
       .int("employeeId must be a positive integer")
       .positive("employeeId must be a positive integer")
       .nullish(),
-    password: z
-      .string({ error: "password is required" })
-      .min(8, "password must be at least 8 characters")
-      // bcrypt ignores everything after 72 bytes, so longer passwords would be silently cut.
-      .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "password must be at most 72 bytes"),
+    password: newPassword("password"),
   })
   .refine((data) => !LINKED_ROLES.includes(data.role) || data.employeeId, {
     error: "A MANAGER or EMPLOYEE account needs the employeeId of the employee it belongs to",
@@ -50,4 +53,18 @@ const createAdminSchema = z
     path: ["employeeId"],
   });
 
-module.exports = { ROLES, LINKED_ROLES, loginSchema, createAdminSchema };
+// Body of POST /api/auth/change-password
+const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string({ error: "currentPassword is required" })
+      .min(1, "currentPassword is required")
+      .max(200, "currentPassword is too long"),
+    newPassword: newPassword("newPassword"),
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    error: "The new password must be different from the current one",
+    path: ["newPassword"],
+  });
+
+module.exports = { ROLES, LINKED_ROLES, loginSchema, createAdminSchema, changePasswordSchema };
