@@ -78,3 +78,24 @@ export function timeAgo(iso) {
   if (days === 1) return "yesterday";
   return `${days} days ago`;
 }
+
+// ---------- Months ("2026-10") ----------
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+export function addMonths(monthKey, months) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const index = year * 12 + (month - 1) + months;
+  return `${Math.floor(index / 12)}-${pad((index % 12) + 1)}`;
+}
+
+// "2026-10" -> "October 2026"
+export function formatMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
+// Minutes as hours with one decimal, like "152.5 h"
+export function formatHours(minutes) {
+  return `${(minutes / 60).toFixed(1)} h`;
+}

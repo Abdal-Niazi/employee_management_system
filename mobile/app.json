@@ -31,7 +31,8 @@
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID to confirm it's you when you check in or out."
         }
-      ]
+      ],
+      "expo-sharing"
     ]
   }
 }

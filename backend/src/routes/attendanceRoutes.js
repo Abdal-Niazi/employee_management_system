@@ -13,6 +13,9 @@ router.use(requireAuth, requireRole("HR_ADMIN"));
 
 router.get("/", attendanceController.getAttendance);
 
+// A month of everyone's attendance, counted per person (JSON, or a CSV file with ?format=csv)
+router.get("/report", attendanceController.getReport);
+
 router.put("/", validate(recordAttendanceSchema), attendanceController.recordAttendance);
 
 router.delete("/:employeeId/:date", validate(clearAttendanceSchema), attendanceController.clearAttendance);

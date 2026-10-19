@@ -1,4 +1,4 @@
-import { request } from "./client";
+import { request, requestText } from "./client";
 
 // Everything the HR admin screens need from /api/employees (HR admins only).
 
@@ -134,6 +134,20 @@ export async function removeAttendance(employeeId, date, note) {
     body: JSON.stringify({ note: note?.trim() || null }),
   });
   return record;
+}
+
+// One month (like "2026-10"; none = the company's current month) of everyone's attendance, counted
+// per person -> { month, from, to, today, partial, workdays, shift, rows: [{ employee, scheduledDays,
+// counts: { PRESENT, LATE, ABSENT, ON_LEAVE, NOT_IN, INACTIVE }, daysWorked, workedMinutes, openDays }],
+// totals }. Only the days up to today are counted.
+export function getAttendanceReport(month) {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return request(`/api/attendance/report${query}`);
+}
+
+// The same month as the text of a CSV file, to open in a spreadsheet.
+export function getAttendanceReportCsv(month) {
+  return requestText(`/api/attendance/report?month=${encodeURIComponent(month)}&format=csv`);
 }
 
 // Managers' correction requests (status PENDING, APPROVED or REJECTED; none = all, waiting first)

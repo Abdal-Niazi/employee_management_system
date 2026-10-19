@@ -31,7 +31,9 @@ export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler;
 }
 
-export async function request(path, options = {}) {
+// Sends the request with the Bearer token and a timeout. Answers the Response, and the token it was
+// sent with (to tell a late 401 from a current one).
+async function send(path, options) {
   if (INSECURE_API) {
     throw new ApiError("This build needs an https:// API address (EXPO_PUBLIC_API_URL).", 0);
   }
@@ -61,14 +63,31 @@ export async function request(path, options = {}) {
     clearTimeout(timer);
   }
 
+  return { response, sentToken };
+}
+
+// A refused answer becomes an ApiError (and a 401 for the current login signs it out).
+function refuse(response, body, sentToken) {
+  // A 401 for the token still in use means it expired or was revoked — sign out. A late 401
+  // from a request sent before a new login must not sign that new login out.
+  if (response.status === 401 && sentToken && sentToken === authToken) onUnauthorized?.();
+  throw new ApiError(body.message || `Request failed (${response.status})`, response.status, body.errors);
+}
+
+export async function request(path, options = {}) {
+  const { response, sentToken } = await send(path, options);
   const body = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    // A 401 for the token still in use means it expired or was revoked — sign out. A late 401
-    // from a request sent before a new login must not sign that new login out.
-    if (response.status === 401 && sentToken && sentToken === authToken) onUnauthorized?.();
-    throw new ApiError(body.message || `Request failed (${response.status})`, response.status, body.errors);
-  }
+  if (!response.ok) refuse(response, body, sentToken);
 
   return body;
+}
+
+// For an answer that is text, not JSON (a CSV file). Errors still come as JSON.
+export async function requestText(path, options = {}) {
+  const { response, sentToken } = await send(path, options);
+
+  if (!response.ok) refuse(response, await response.json().catch(() => ({})), sentToken);
+
+  return response.text();
 }
