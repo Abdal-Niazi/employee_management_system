@@ -98,6 +98,7 @@ export default function HrAttendanceScreen() {
               count={data.waiting}
               onPress={() => router.push("/attendance-requests")}
             />
+            <LinkRow icon="bar-chart-outline" label="Monthly report" onPress={() => router.push("/attendance-report")} />
             {data.rows.length > 0 && (
               <Text style={font.small}>Tap a person to write, fix or remove their check-in.</Text>
             )}

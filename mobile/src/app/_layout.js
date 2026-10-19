@@ -47,6 +47,10 @@ function RootNavigator() {
           name="attendance-requests"
           options={{ headerShown: true, title: "Requests from managers", headerBackTitle: "Back" }}
         />
+        <Stack.Screen
+          name="attendance-report"
+          options={{ headerShown: true, title: "Monthly report", headerBackTitle: "Back" }}
+        />
       </Stack.Protected>
 
       <Stack.Protected guard={isEmployee && !mustChangePassword}>

@@ -29,7 +29,7 @@ out. One account per employee.
 | `POST /api/auth/change-password` | any signed-in account, for its own password (see below) |
 | `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET /:id/device`, `POST /:id/device/approve` and `DELETE /:id/device` for the check-in phone; `GET`, `POST`, `PATCH /:id/account` and `POST /:id/account/reset-password` for the person's login) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
-| `/api/attendance` (everyone's day; write, fix or remove a check-in) | `HR_ADMIN` |
+| `/api/attendance` (everyone's day; write, fix or remove a check-in), `GET /api/attendance/report` (a month, per person) | `HR_ADMIN` |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
 | `/api/leave-requests` (everyone's leave, approve/reject any) | `HR_ADMIN` |
 | `/api/me/...` (own profile, check-in, check-out, attendance, leave) | `EMPLOYEE`, `MANAGER`; always the signed-in account's own employee |
@@ -201,6 +201,24 @@ numbers come from the requests, nothing is stored: change a setting and every ye
 The leave lists managers and HR admins decide from carry a `balance` on every pending request (what
 is left of that kind in the year it starts in, carried days included, with the request's own days
 already held back), and `balance: null` on decided ones.
+
+## Monthly attendance report
+
+`GET /api/attendance/report?month=2026-10` (HR only) counts one month of everyone's attendance, per
+person, with the same status of each day as the day screens. `month` is `YYYY-MM` (default: the
+company's current month; a month that hasn't started is a 400). Only days up to today are counted, so
+a month in progress has `partial: true` and `to` is today. A row has `scheduledDays` (Monday to Friday
+days from the hire date), `counts` (`PRESENT`, `LATE`, `ABSENT`, `ON_LEAVE`, `NOT_IN`, `INACTIVE`),
+`daysWorked` (present plus late, so a weekend that was worked counts), `workedMinutes` (from days
+with both a check-in and a check-out) and `openDays` (past days with a check-in and no check-out, so
+HR knows what to fix). Weekends and days before the hire date are not counted as anything. People who
+left (`terminated`) and people hired after the month are left out, like on the day screen. `totals`
+adds the rows up, and nothing about a person beyond name, ID, department and position is sent.
+
+`&format=csv` answers the same table as a file download (`attendance-2026-10.csv`): one row per
+person and a Total row, with a byte order mark so Excel reads accented letters, Windows line endings,
+and a `'` in front of any cell that starts with `=`, `+`, `-` or `@` so a name can't run as a
+formula when the file is opened.
 
 ## Logins for employees
 

@@ -77,6 +77,7 @@ All calls go through `src/api/hr.js`.
 | Employee's check-in phone: approve, reject, reset | `GET /api/employees/:id/device`, `POST /api/employees/:id/device/approve`, `DELETE /api/employees/:id/device` |
 | Leave: every employee's requests, approve or reject any | `GET /api/leave-requests?status=`, `PATCH /api/leave-requests/:id` |
 | Attendance: everyone's day | `GET /api/attendance?date=`, `PUT /api/attendance`, `DELETE /api/attendance/:employeeId/:date` |
+| Monthly report (a month per person, CSV export) | `GET /api/attendance/report?month=` (and `&format=csv`) |
 | Requests from managers | `GET /api/attendance-corrections?status=`, `PATCH /api/attendance-corrections/:id` |
 
 HR decides leave for anyone, which is how leave gets decided for people who have no manager; the
@@ -85,6 +86,13 @@ remove their check-in for that day, with an optional note. Every HR change is ke
 (who, when, the times before and the note), and managers and employees see the day as "Corrected
 by HR". **Requests from managers** (with the number waiting) lists the corrections managers asked
 for; approving one changes the record.
+
+**Monthly report.** A row on the Attendance tab opens `attendance-report.js`: a month at a time (the
+arrows stop at the company's current month, which the server sends), with the whole company's
+person-days (present, late, absent, on leave), the hours worked, and for each person their present,
+late, absent and leave days, the hours, and how many days were left without a check-out. **Export as
+CSV** downloads the file in a browser; on a phone it saves the file and opens the share sheet (Drive,
+WhatsApp, email, Sheets or Excel). It uses `expo-file-system` and `expo-sharing`, which Expo Go includes.
 
 ## Manager screens
 
