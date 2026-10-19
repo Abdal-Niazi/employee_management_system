@@ -131,6 +131,10 @@ model Admin {
   passwordHash        String
   // Goes up when the password changes; logins (tokens) made with an older value stop working
   tokenVersion        Int                    @default(0)
+  // A temporary password HR handed out: the person has to choose their own before anything else
+  mustChangePassword  Boolean                @default(false)
+  // HR turned this login off (set to when): it can't sign in and its tokens stop working
+  disabledAt          DateTime?
   role                Role                   @default(HR_ADMIN)
   // For MANAGER and EMPLOYEE accounts: the employee they are (a manager's team hangs off it)
   employeeId          Int?                   @unique

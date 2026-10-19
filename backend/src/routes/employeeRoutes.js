@@ -1,9 +1,11 @@
 const express = require("express");
 const employeeController = require("../controllers/employeeController");
 const deviceController = require("../controllers/deviceController");
+const accountController = require("../controllers/accountController");
 const validate = require("../middleware/validate");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
+const { createAccountSchema, updateAccountSchema } = require("../validators/accountSchema");
 const { approveDeviceSchema } = require("../validators/deviceSchema");
 const { createEmployeeSchema, updateEmployeeSchema } = require("../validators/employeeSchema");
 
@@ -30,5 +32,15 @@ router.get("/:id/device", deviceController.getDevice);
 router.post("/:id/device/approve", validate(approveDeviceSchema), deviceController.approveDevice);
 
 router.delete("/:id/device", deviceController.resetDevice);
+
+// A person's login (their account in the app). HR creates it with a temporary password, resets a
+// forgotten one, turns the login off or on, and switches it between employee and manager.
+router.get("/:id/account", accountController.getAccount);
+
+router.post("/:id/account", validate(createAccountSchema), accountController.createAccount);
+
+router.patch("/:id/account", validate(updateAccountSchema), accountController.updateAccount);
+
+router.post("/:id/account/reset-password", accountController.resetPassword);
 
 module.exports = router;

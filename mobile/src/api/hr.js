@@ -55,6 +55,42 @@ export async function resetEmployeeDevice(id) {
   await request(`/api/employees/${id}/device`, { method: "DELETE" });
 }
 
+// An employee's login (their account in the app). null when they have none, otherwise
+// { email, role: "EMPLOYEE" | "MANAGER", status: "ACTIVE" | "DISABLED", mustChangePassword, createdAt }.
+export async function getEmployeeAccount(id) {
+  const { account } = await request(`/api/employees/${id}/account`);
+  return account;
+}
+
+// Creates the login with a temporary password -> { account, temporaryPassword }. The password is
+// answered once and never stored; the person chooses their own when they first sign in. Without an
+// email, the employee's own is used.
+export async function createEmployeeAccount(id, { role, email }) {
+  const { account, temporaryPassword } = await request(`/api/employees/${id}/account`, {
+    method: "POST",
+    body: JSON.stringify({ role, ...(email && { email }) }),
+  });
+  return { account, temporaryPassword };
+}
+
+// For a forgotten password: a new temporary one -> { account, temporaryPassword }, and the person is
+// signed out everywhere.
+export async function resetEmployeePassword(id) {
+  const { account, temporaryPassword } = await request(`/api/employees/${id}/account/reset-password`, {
+    method: "POST",
+  });
+  return { account, temporaryPassword };
+}
+
+// { role } and/or { disabled } -> the account. Either one signs out the person's logins.
+export async function updateEmployeeAccount(id, changes) {
+  const { account } = await request(`/api/employees/${id}/account`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+  return account;
+}
+
 // Leave: HR admins see everyone's requests and can decide any of them (managers decide their team's).
 
 // status: PENDING, APPROVED or REJECTED (no status = all)

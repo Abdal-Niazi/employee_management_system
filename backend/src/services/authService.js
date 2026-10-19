@@ -10,7 +10,15 @@ const BCRYPT_ROUNDS = 12;
 const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", BCRYPT_ROUNDS);
 
 // employeeId is set for MANAGER and EMPLOYEE accounts: the employee the account belongs to.
-const toPublicAdmin = ({ id, email, name, role, employeeId }) => ({ id, email, name, role, employeeId });
+// mustChangePassword: HR gave a temporary password, so the person has to choose their own first.
+const toPublicAdmin = ({ id, email, name, role, employeeId, mustChangePassword }) => ({
+  id,
+  email,
+  name,
+  role,
+  employeeId,
+  mustChangePassword,
+});
 
 const hashPassword = (password) => bcrypt.hash(password, BCRYPT_ROUNDS);
 
@@ -36,6 +44,11 @@ const login = async (email, password) => {
     throw new AppError("Invalid email or password", 401);
   }
 
+  // Only said to someone who knows the right password, so it doesn't reveal which emails have a login.
+  if (admin.disabledAt) {
+    throw new AppError("This login has been turned off. Please contact HR.", 403);
+  }
+
   return { token: signToken(admin), admin: toPublicAdmin(admin) };
 };
 
@@ -53,8 +66,9 @@ const getAdminFromToken = async (token) => {
     where: { id: Number(payload.sub) },
   });
 
-  // Tokens from before versions existed carry none, which counts as 0 (no change yet).
-  if (!admin || (payload.v ?? 0) !== admin.tokenVersion) {
+  // Tokens from before versions existed carry none, which counts as 0 (no change yet). A login HR
+  // turned off stops working at once.
+  if (!admin || admin.disabledAt || (payload.v ?? 0) !== admin.tokenVersion) {
     throw new AppError("Invalid or expired token", 401);
   }
 
@@ -75,7 +89,7 @@ const changePassword = async (adminId, { currentPassword, newPassword }) => {
   // goes through (the other could otherwise undo it with its own new password).
   const { count } = await prisma.admin.updateMany({
     where: { id: adminId, passwordHash: admin.passwordHash },
-    data: { passwordHash: await hashPassword(newPassword), tokenVersion: { increment: 1 } },
+    data: { passwordHash: await hashPassword(newPassword), tokenVersion: { increment: 1 }, mustChangePassword: false },
   });
   if (count === 0) {
     throw new AppError("Your password was just changed somewhere else. Sign in again with the new one.", 409);

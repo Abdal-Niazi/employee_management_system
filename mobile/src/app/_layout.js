@@ -14,6 +14,9 @@ function RootNavigator() {
   const isHrAdmin = user?.role === "hr_admin";
   // Employee accounts get their own check-in, attendance, leave and profile screens.
   const isEmployee = user?.role === "employee";
+  const knownRole = isManager || isHrAdmin || isEmployee;
+  // Signed in with a temporary password from HR: nothing else opens until they choose their own.
+  const mustChangePassword = Boolean(user?.mustChangePassword);
 
   // A spinner, not the login screen, while a saved session is being checked.
   if (restoring) return <LoadingState />;
@@ -26,7 +29,7 @@ function RootNavigator() {
         <Stack.Screen name="login" />
       </Stack.Protected>
 
-      <Stack.Protected guard={isManager}>
+      <Stack.Protected guard={isManager && !mustChangePassword}>
         <Stack.Screen name="(manager)" />
         <Stack.Screen
           name="member/[id]"
@@ -38,7 +41,7 @@ function RootNavigator() {
         />
       </Stack.Protected>
 
-      <Stack.Protected guard={isHrAdmin}>
+      <Stack.Protected guard={isHrAdmin && !mustChangePassword}>
         <Stack.Screen name="(hr)" />
         <Stack.Screen
           name="attendance-requests"
@@ -46,17 +49,17 @@ function RootNavigator() {
         />
       </Stack.Protected>
 
-      <Stack.Protected guard={isEmployee}>
+      <Stack.Protected guard={isEmployee && !mustChangePassword}>
         <Stack.Screen name="(employee)" />
       </Stack.Protected>
 
       {/* Only for a role this version of the app doesn't know */}
-      <Stack.Protected guard={Boolean(user) && !isManager && !isHrAdmin && !isEmployee}>
+      <Stack.Protected guard={Boolean(user) && !knownRole && !mustChangePassword}>
         <Stack.Screen name="coming-soon" />
       </Stack.Protected>
 
       {/* Every signed-in account, opened from the key icon in the header. Last, so signing in
-          never lands here first. */}
+          never lands here first, unless a temporary password leaves nothing else to open. */}
       <Stack.Protected guard={Boolean(user)}>
         <Stack.Screen
           name="change-password"

@@ -67,4 +67,4 @@ const changePasswordSchema = z
     path: ["newPassword"],
   });
 
-module.exports = { ROLES, LINKED_ROLES, loginSchema, createAdminSchema, changePasswordSchema };
+module.exports = { ROLES, LINKED_ROLES, email, loginSchema, createAdminSchema, changePasswordSchema };
