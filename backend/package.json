@@ -8,7 +8,10 @@
   },
   "scripts": {
     "start": "node server.js",
+    "build": "prisma generate",
+    "start:prod": "prisma migrate deploy && node server.js",
     "migrate:deploy": "prisma migrate deploy",
+    "check-deploy": "node scripts/checkDeployment.js",
     "create-admin": "node scripts/createAdmin.js",
     "reset-device": "node scripts/resetDevice.js",
     "seed": "node scripts/seed.js",
@@ -29,10 +32,10 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.0",
+    "prisma": "^7.10.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "prisma": "^7.10.0",
     "supertest": "^7.3.1"
   }
 }

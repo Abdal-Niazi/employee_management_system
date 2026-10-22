@@ -12,6 +12,9 @@ npm run create-admin          # an HR_ADMIN account, or a MANAGER / EMPLOYEE lin
 npm run reset-device -- EMP001  # HR: forget EMP001's lost or replaced phone (the app has a button too)
 npm run seed                  # optional: sample leave requests and six weeks of attendance
 npm start                     # http://localhost:5000
+npm run build                 # prisma generate (a host runs it after npm ci)
+npm run start:prod            # migrate:deploy, then start: what a host runs
+npm run check-deploy -- https://your-api.example.com   # checks an online API from the outside
 ```
 
 `create-admin` asks for a role. Use it for the **first HR admin**; after that HR creates the logins

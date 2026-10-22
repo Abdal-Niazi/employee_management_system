@@ -50,6 +50,13 @@ You need Node.js 20.19 or newer and PostgreSQL.
    password, turns a login off or on, and switches it between employee and manager. Give employees a
    manager by editing them in the app.
 
+## Putting it online
+
+The API runs on one laptop for now. `DEPLOY.md` explains how to put it on a server with an `https://`
+address (Render for the API, Neon for the database, both with a free tier to try it), how to create
+the first HR admin there, check the result with `npm run check-deploy`, and build the Android app (an
+APK) that other people install. The repository is already prepared: `render.yaml`, `mobile/eas.json`.
+
 ## Day to day
 
 - **Tests:** `npm test` in `backend/` (uses its own `_test` database, never your real one) and

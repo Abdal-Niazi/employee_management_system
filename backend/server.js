@@ -1,15 +1,15 @@
 // backend/.env, wherever the server is started from
 require("dotenv").config({ path: require("path").join(__dirname, ".env"), quiet: true });
 
-// Refuse to start with settings that would make the API unsafe or broken.
-const configErrors = [];
-if (!process.env.DATABASE_URL) configErrors.push("DATABASE_URL is not set.");
-if (!process.env.JWT_SECRET) configErrors.push("JWT_SECRET is not set.");
-else if (process.env.JWT_SECRET.length < 32) configErrors.push("JWT_SECRET must be at least 32 characters long.");
+// Refuse to start with settings that would make the API unsafe or broken, and warn about the ones
+// that are probably a mistake.
+const { errors: configErrors, warnings: configWarnings } = require("./src/utils/config").checkConfig();
+
+configWarnings.forEach((message) => console.warn(`Warning: ${message}`));
 
 if (configErrors.length > 0) {
   configErrors.forEach((message) => console.error(message));
-  console.error("Fix backend/.env (see .env.example) and start the server again.");
+  console.error("Fix backend/.env (see .env.example), or the settings of your host, and start the server again.");
   process.exit(1);
 }
 
