@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { getMyLeaveBalance } from "../api/me";
 import { colors, font, radius, spacing } from "../theme";
 import { todayKey } from "../utils/date";
 import Button from "./Button";
@@ -39,6 +40,29 @@ function Form({ today, balance, saving, error, onCancel, onSubmit }) {
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState("");
 
+  // A request counts towards the year it starts in, so the hint follows the first day: the balance of
+  // each year asked about is fetched once and kept (this year's came with the screen).
+  const [balances, setBalances] = useState(balance ? { [balance.year]: balance } : {});
+  const start = startDate.trim();
+  const year = isRealDate(start) ? Number(start.slice(0, 4)) : (balance?.year ?? null);
+  const yearBalance = year ? balances[year] : null;
+
+  useEffect(() => {
+    if (!year || balances[year]) return undefined;
+
+    let stale = false;
+    getMyLeaveBalance(year)
+      .then((fetched) => {
+        if (!stale) setBalances((all) => ({ ...all, [year]: fetched }));
+      })
+      // No hint is better than a wrong one; the server still checks the request
+      .catch(() => {});
+
+    return () => {
+      stale = true;
+    };
+  }, [year, balances]);
+
   const handleSubmit = () => {
     const start = startDate.trim();
     const end = endDate.trim();
@@ -60,8 +84,10 @@ function Form({ today, balance, saving, error, onCancel, onSubmit }) {
 
         <Text style={styles.label}>Type</Text>
         <SegmentedControl options={TYPES} value={type} onChange={setType} />
-        {balance ? (
-          <Text style={styles.hint}>{balanceHint(balance.balances.find((b) => b.type === type), balance.year)}</Text>
+        {yearBalance ? (
+          <Text style={styles.hint}>
+            {balanceHint(yearBalance.balances.find((b) => b.type === type), yearBalance.year)}
+          </Text>
         ) : null}
 
         <Text style={styles.label}>First day</Text>
