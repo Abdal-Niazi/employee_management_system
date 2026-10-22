@@ -38,7 +38,7 @@ export default function ProfileScreen() {
     >
       <Card>
         <View style={styles.profile}>
-          <Avatar firstName={employee.firstName} lastName={employee.lastName} size={64} />
+          <Avatar firstName={employee.firstName} lastName={employee.lastName} size={64} photoFor={employee} />
           <View style={styles.flex}>
             <Text style={font.title}>{fullName(employee)}</Text>
             <Text style={font.small}>
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
       <Card title="Reports to">
         {manager ? (
           <View style={styles.profile}>
-            <Avatar firstName={manager.firstName} lastName={manager.lastName} size={40} />
+            <Avatar firstName={manager.firstName} lastName={manager.lastName} size={40} photoFor={manager} />
             <View style={styles.flex}>
               <Text style={font.body}>{fullName(manager)}</Text>
               <Text style={font.small}>{manager.position || manager.employeeId}</Text>

@@ -47,7 +47,7 @@ export default function ManagerPicker({ value, options, onChange }) {
                     <Text style={[font.body, styles.flex]}>No manager</Text>
                   ) : (
                     <>
-                      <Avatar firstName={item.firstName} lastName={item.lastName} size={32} />
+                      <Avatar firstName={item.firstName} lastName={item.lastName} size={32} photoFor={item} />
                       <View style={styles.flex}>
                         <Text style={font.body} numberOfLines={1}>
                           {fullName(item)}

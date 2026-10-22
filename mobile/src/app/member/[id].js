@@ -45,7 +45,7 @@ export default function MemberScreen() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <Card>
           <View style={styles.profile}>
-            <Avatar firstName={member.firstName} lastName={member.lastName} size={64} />
+            <Avatar firstName={member.firstName} lastName={member.lastName} size={64} photoFor={member} />
             <View style={styles.flex}>
               <Text style={font.title}>{fullName(member)}</Text>
               <Text style={font.small}>

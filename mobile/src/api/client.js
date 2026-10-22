@@ -31,6 +31,18 @@ export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler;
 }
 
+// Where to load an employee's photo from, for an <Image>: the address plus the login, since only
+// people who may see it are allowed to (the answer is a picture, not JSON). `photoUpdatedAt` (from the
+// employee's data, null when there is no photo) is in the address, so a new photo is a new picture.
+export function photoSource(employeeId, photoUpdatedAt) {
+  if (!employeeId || !photoUpdatedAt || !authToken) return null;
+
+  return {
+    uri: `${API_URL}/api/photos/${employeeId}?v=${new Date(photoUpdatedAt).getTime()}`,
+    headers: { Authorization: `Bearer ${authToken}` },
+  };
+}
+
 // Sends the request with the Bearer token and a timeout. Answers the Response, and the token it was
 // sent with (to tell a late 401 from a current one).
 async function send(path, options) {

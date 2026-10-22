@@ -33,6 +33,8 @@ out. One account per employee.
 | `/api/employees` (list with `?page=&pageSize=`, get, create, update, delete; `GET /:id/device`, `POST /:id/device/approve` and `DELETE /:id/device` for the check-in phone; `GET`, `POST`, `PATCH /:id/account` and `POST /:id/account/reset-password` for the person's login) | `HR_ADMIN` |
 | `/api/manager/...` (team, team member, leave requests, approve/reject, attendance, correction requests) | `MANAGER`, own team only |
 | `/api/attendance` (everyone's day; write, fix or remove a check-in), `GET /api/attendance/report` (a month, per person) | `HR_ADMIN` |
+| `GET /api/photos/:employeeId` (the picture) | any signed-in account, for the photos it may see (see below) |
+| `PUT`, `DELETE /api/photos/:employeeId` (set or remove a photo) | `HR_ADMIN` |
 | `/api/attendance-corrections` (list, approve/reject) | `HR_ADMIN` |
 | `/api/leave-requests` (everyone's leave, approve/reject any) | `HR_ADMIN` |
 | `/api/me/...` (own profile, check-in, check-out, attendance, leave) | `EMPLOYEE`, `MANAGER`; always the signed-in account's own employee |
@@ -204,6 +206,26 @@ numbers come from the requests, nothing is stored: change a setting and every ye
 The leave lists managers and HR admins decide from carry a `balance` on every pending request (what
 is left of that kind in the year it starts in, carried days included, with the request's own days
 already held back), and `balance: null` on decided ones.
+
+## Employee photos
+
+An employee can have a photo, put on by HR (`PUT /api/photos/:employeeId` with
+`{ image: "<base64 of a JPEG>" }`; `DELETE` takes it off). The picture is kept **in the database**, in
+its own table (`EmployeePhoto`, a `bytea` column), so it is backed up with everything else and needs no
+file storage on the server (a host's disk is wiped on every deploy). The employee only has
+`photoUpdatedAt`: `null` when there is no photo, otherwise when it was set. It is part of every
+employee answer (the list, one employee, a team, a profile and the manager shown on it), and the
+apps put it in the picture's address (`?v=`), so a new photo is a new address and old ones can be kept.
+
+- **What is accepted:** a JPEG of at most 200 KB once decoded (the app sends a 400 x 400 square cut from
+  the middle, about 30 to 60 KB). Only the start of the file is checked (`ff d8 ff`); it is always
+  served back as `image/jpeg` with `nosniff`, so whatever else it holds can't run. The request body
+  limit for this one route is 400 KB (the others keep 100 KB).
+- **Who sees it** (`GET`, which answers the bytes, with `Cache-Control: private`): HR everyone's; a
+  manager their team's and their own; an employee their own and their manager's. Anyone else gets a
+  404, the same as for a person without a photo, so the answer doesn't say who has one.
+- Deleting an employee deletes their photo. A photo adds a few tens of KB per person to the database
+  (and to its backups).
 
 ## Monthly attendance report
 

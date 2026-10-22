@@ -22,7 +22,9 @@ const countWorkingDays = (startKey, endKey) => {
 const getProfile = async (employeeId) => {
   const employee = await prisma.employee.findUnique({
     where: { id: employeeId },
-    include: { manager: { select: { id: true, employeeId: true, firstName: true, lastName: true, position: true } } },
+    include: {
+      manager: { select: { id: true, employeeId: true, firstName: true, lastName: true, position: true, photoUpdatedAt: true } },
+    },
   });
 
   return employee;

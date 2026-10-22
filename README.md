@@ -12,7 +12,7 @@ approve their team's leave, and employees check in and out and ask for leave fro
 
 | Role | What they do in the app |
 |---|---|
-| **HR admin** | Adds, edits and deletes employees, approves the phone each person checks in from, writes or corrects attendance (and approves managers' correction requests), and sees and decides everyone's leave (this is how leave gets decided for people with no manager) |
+| **HR admin** | Adds, edits and deletes employees (with a photo for each), approves the phone each person checks in from, writes or corrects attendance (and approves managers' correction requests), and sees and decides everyone's leave (this is how leave gets decided for people with no manager) |
 | **Manager** | Sees their own team, the team's attendance for a day (and asks HR to correct a wrong one), approves or rejects the team's leave, and checks in like an employee |
 | **Employee** | Checks in and out from their registered phone (with a fingerprint), sees their profile and manager, their attendance and leave balance, and asks for or cancels leave |
 
