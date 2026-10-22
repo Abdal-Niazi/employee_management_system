@@ -87,6 +87,17 @@ remove their check-in for that day, with an optional note. Every HR change is ke
 by HR". **Requests from managers** (with the number waiting) lists the corrections managers asked
 for; approving one changes the record.
 
+**Photos.** On an employee's page HR has **Add photo** (or **Change photo** and **Remove**).
+`utils/pickPhoto.js` opens the gallery (`expo-image-picker`), cuts a square from the middle and shrinks
+it to 400 px as a JPEG (`expo-image-manipulator`), and the app sends it as base64 text. Every `Avatar`
+that is given the employee (`photoFor={employee}`) shows the photo when the employee has one
+(`photoUpdatedAt`), else the initials, and falls back to the initials if the picture can't be loaded.
+Photos are only for signed-in people, so a phone's `<Image>` loads them with the login as a header
+(`photoSource` in `api/client.js`); a browser can't do that with an `<img>`, so on the web
+`hooks/usePhotoSource.js` fetches the picture with the login and shows a local copy. They show in the
+HR employee list and page, the manager's team and a team member's page, and on an employee's own
+profile (with their manager's). On iOS the permission text is set in `app.json`.
+
 **Monthly report.** A row on the Attendance tab opens `attendance-report.js`: a month at a time (the
 arrows stop at the company's current month, which the server sends), with the whole company's
 person-days (present, late, absent, on leave), the hours worked, and for each person their present,
