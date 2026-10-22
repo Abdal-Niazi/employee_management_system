@@ -1,0 +1,34 @@
+# Render blueprint for the API. The database lives on Neon (see DEPLOY.md), so only the web service
+# is described here. In Render: New > Blueprint > pick this repository.
+services:
+  - type: web
+    name: ems-api
+    runtime: node
+    # The closest region to Pakistan. It can't be changed after the service exists.
+    region: singapore
+    # "free" costs nothing, but the service sleeps after 15 minutes without a request and the first
+    # request after that takes 30 to 60 seconds (the app gives up after 10). Fine for trying it out.
+    # For real use pick an always-on paid plan: see DEPLOY.md and Render's pricing page for its name.
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    # Applies the database migrations that are still missing, then starts the server
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # One proxy (Render's) is in front of the server, so the rate limits count each user separately
+      - key: TRUST_PROXY
+        value: "1"
+      - key: COMPANY_TIMEZONE
+        value: Asia/Karachi
+      # Made up by Render (a random 256-bit value), and kept: changing it signs everybody out
+      - key: JWT_SECRET
+        generateValue: true
+      # Neon's connection string. Render asks for it once, when the blueprint is created.
+      - key: DATABASE_URL
+        sync: false

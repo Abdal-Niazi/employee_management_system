@@ -9,6 +9,21 @@ if (process.env.NODE_ENV === "production") {
   process.exit(1);
 }
 
+// ...and never into a database on another machine, whatever NODE_ENV says. The address of the
+// hosted database is often set in the shell for a moment (to run create-admin on it), and a seed
+// run then would fill the real company's database with sample people.
+const databaseHost = (() => {
+  try {
+    return new URL(process.env.DATABASE_URL ?? "").hostname;
+  } catch {
+    return "";
+  }
+})();
+if (databaseHost && !["localhost", "127.0.0.1", "[::1]"].includes(databaseHost)) {
+  console.error(`Refusing to seed: DATABASE_URL points at ${databaseHost}, not at this machine. npm run seed only adds sample data to a local development database.`);
+  process.exit(1);
+}
+
 const prisma = require("../src/utils/prisma");
 const companyTime = require("../src/utils/companyTime");
 const { SHIFT } = require("../src/utils/attendanceRules");
