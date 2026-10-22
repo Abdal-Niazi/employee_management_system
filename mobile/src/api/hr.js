@@ -55,6 +55,17 @@ export async function resetEmployeeDevice(id) {
   await request(`/api/employees/${id}/device`, { method: "DELETE" });
 }
 
+// An employee's photo: a JPEG as base64 text (cut to a square and shrunk first, see utils/pickPhoto)
+// -> the date it was set. HR only; everyone who may see it loads it through `photoSource`.
+export async function saveEmployeePhoto(id, image) {
+  const { photoUpdatedAt } = await request(`/api/photos/${id}`, { method: "PUT", body: JSON.stringify({ image }) });
+  return photoUpdatedAt;
+}
+
+export async function removeEmployeePhoto(id) {
+  await request(`/api/photos/${id}`, { method: "DELETE" });
+}
+
 // An employee's login (their account in the app). null when they have none, otherwise
 // { email, role: "EMPLOYEE" | "MANAGER", status: "ACTIVE" | "DISABLED", mustChangePassword, createdAt }.
 export async function getEmployeeAccount(id) {

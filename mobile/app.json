@@ -33,7 +33,13 @@
           "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID to confirm it's you when you check in or out."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to choose a photo of an employee."
+        }
+      ]
     ]
   }
 }

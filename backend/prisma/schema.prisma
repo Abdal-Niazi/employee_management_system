@@ -20,6 +20,11 @@ model Employee {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // When the photo was last set (null: no photo). The picture itself is in EmployeePhoto, so listing
+  // employees never loads it, and the apps use this to know whether to show one and when it changed.
+  photoUpdatedAt DateTime?
+  photo          EmployeePhoto? @relation("EmployeePhoto")
+
   // The employee's manager (also an employee). Deleting a manager unlinks their team.
   managerId Int?
   manager   Employee?  @relation("ManagerReports", fields: [managerId], references: [id], onDelete: SetNull)
@@ -165,4 +170,13 @@ model RegisteredDevice {
   approvedAt   DateTime?
   createdAt    DateTime  @default(now()) // when it was registered
   lastUsedAt   DateTime?
+}
+
+// An employee's photo: a small JPEG (the app sends it cropped to a square and shrunk), kept in the
+// database so it is backed up with everything else and needs no file storage on the server.
+model EmployeePhoto {
+  employeeId  Int      @id
+  employee    Employee @relation("EmployeePhoto", fields: [employeeId], references: [id], onDelete: Cascade)
+  data        Bytes
+  contentType String   @default("image/jpeg")
 }

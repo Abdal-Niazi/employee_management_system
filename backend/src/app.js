@@ -10,6 +10,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const correctionRoutes = require("./routes/correctionRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const meRoutes = require("./routes/meRoutes");
+const photoRoutes = require("./routes/photoRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -37,6 +38,9 @@ if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PRO
 
 app.use(helmet());
 app.use(cors(corsOptions));
+// A photo is sent as base64 text and is bigger than any other request: its own, larger limit, set
+// before the general one (which skips a body that is already read).
+app.use("/api/photos", express.json({ limit: "400kb" }));
 app.use(express.json({ limit: "100kb" }));
 
 app.use("/api", addressLimiter);
@@ -48,6 +52,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/attendance-corrections", correctionRoutes);
 app.use("/api/leave-requests", leaveRoutes);
 app.use("/api/me", meRoutes);
+app.use("/api/photos", photoRoutes);
 
 app.get("/", (req, res) => {
   res.json({
