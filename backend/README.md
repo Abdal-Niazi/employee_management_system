@@ -301,7 +301,8 @@ run). The script refuses to run against `DATABASE_URL`.
 - Never run `npm run seed` there: it refuses when `NODE_ENV=production`, because it adds sample data.
 
 Built in: security headers (helmet), a CORS allow list, 100 kB JSON bodies, bcrypt passwords,
-8-hour tokens, role checks on every route, input validation with length limits, and rate limits:
+12-hour tokens (`JWT_EXPIRES_IN`, so a shift doesn't end with a sign-in; an existing `.env` that sets it
+keeps its own value), role checks on every route, input validation with length limits, and rate limits:
 10 failed sign-ins per 15 minutes per IP **and email** (so typos on one office Wi-Fi don't lock
 everyone out) plus 50 per IP for all emails together (so one address can't try a password on every
 account); 1000 API requests per minute per IP, whatever token is sent, and 300 per signed-in account,

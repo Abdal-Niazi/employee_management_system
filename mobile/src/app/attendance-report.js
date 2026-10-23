@@ -81,7 +81,7 @@ export default function AttendanceReportScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Avatar firstName={item.employee.firstName} lastName={item.employee.lastName} size={36} />
+            <Avatar firstName={item.employee.firstName} lastName={item.employee.lastName} size={36} photoFor={item.employee} />
             <View style={styles.flex}>
               <Text style={styles.name} numberOfLines={1}>
                 {fullName(item.employee)}
