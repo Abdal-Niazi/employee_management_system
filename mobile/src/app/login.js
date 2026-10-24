@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthContext";
@@ -17,10 +17,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Set at once (state only after the next render), so Enter and a tap send one sign-in.
+  const sending = useRef(false);
 
   const handleSignIn = async () => {
     // Enter on the keyboard can fire again while a sign-in is already on its way.
-    if (submitting) return;
+    if (sending.current) return;
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       setError("Enter a valid email address.");
       return;
@@ -30,12 +32,15 @@ export default function LoginScreen() {
       return;
     }
 
+    sending.current = true;
     setSubmitting(true);
     try {
       await login(email.trim(), password);
     } catch (err) {
       setError(err.message);
       setSubmitting(false);
+    } finally {
+      sending.current = false;
     }
   };
 

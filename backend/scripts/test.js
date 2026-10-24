@@ -41,7 +41,11 @@ const env = {
   SHIFT_END: "17:00",
   LATE_GRACE_MINUTES: "5",
   COMPANY_TIMEZONE: "Asia/Karachi",
-  // The leave balance tests count a plain year; tests/carryOver.test.js turns carry-over on for itself.
+  // The leave balance tests expect the default allowance (14 / 8 / 6) and count a plain year;
+  // tests/carryOver.test.js turns carry-over on for itself.
+  LEAVE_ANNUAL_DAYS: "14",
+  LEAVE_SICK_DAYS: "8",
+  LEAVE_CASUAL_DAYS: "6",
   LEAVE_CARRY_OVER_DAYS: "0",
 };
 

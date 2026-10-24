@@ -29,7 +29,7 @@ const signToken = (admin) => {
   if (!Number.isInteger(admin.tokenVersion)) throw new Error("signToken needs the account's tokenVersion");
   return jwt.sign({ sub: String(admin.id), v: admin.tokenVersion }, process.env.JWT_SECRET, {
     algorithm: "HS256",
-    expiresIn: process.env.JWT_EXPIRES_IN || "8h",
+    expiresIn: process.env.JWT_EXPIRES_IN || "12h",
   });
 };
 

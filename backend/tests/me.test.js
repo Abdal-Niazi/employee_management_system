@@ -147,6 +147,9 @@ describe("the /api/me API (real clock)", () => {
 
   before(async () => {
     data = await seedFixtures();
+    // These tests check in on the real clock, so A-1's approved leave (2 to 4 November 2026) would
+    // block them on those days.
+    await prisma.leaveRequest.delete({ where: { id: data.approvedA1.id } });
 
     // Signed in, on their registered phone (its key goes with every request)
     employee = await onApprovedPhone(await login("employee.a1@example.com"), data.a1.id);

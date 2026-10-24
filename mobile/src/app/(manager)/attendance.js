@@ -103,7 +103,7 @@ export default function AttendanceScreen() {
             accessibilityHint={item.record.correctable ? "Ask HR to correct this day" : undefined}
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
           >
-            <Avatar firstName={item.employee.firstName} lastName={item.employee.lastName} size={36} />
+            <Avatar firstName={item.employee.firstName} lastName={item.employee.lastName} size={36} photoFor={item.employee} />
             <View style={styles.flex}>
               <Text style={styles.name} numberOfLines={1}>
                 {fullName(item.employee)}

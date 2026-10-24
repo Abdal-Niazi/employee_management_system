@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
 import { checkIn, checkOut, getMyDay, registerDevice } from "../api/me";
 import { useAuth } from "../auth/AuthContext";
@@ -33,12 +33,20 @@ export default function CheckInCard({ title = "Your attendance today" }) {
   const { user } = useAuth();
   const accountId = user.id;
 
+  // A registration saves the key before the server knows the phone, so a load that comes back with
+  // "no phone" meanwhile must not forget that key. `registering` is set for as long as a registration
+  // runs, and `registrations` counts its start and its end, which also covers a load that began
+  // before it started or is still on its way when it ends.
+  const registering = useRef(false);
+  const registrations = useRef(0);
+
   const load = useCallback(async () => {
+    const started = registrations.current;
     const deviceKey = await loadDeviceKey(accountId);
     const day = await getMyDay(deviceKey);
     // No phone is registered (HR reset or rejected it): the old key is useless, so forget it here
     // as well, and registering again makes a fresh one.
-    if (!day.device && deviceKey) {
+    if (!day.device && deviceKey && !registering.current && registrations.current === started) {
       await clearDeviceKey(accountId);
       return { ...day, deviceKey: null };
     }
@@ -73,12 +81,19 @@ export default function CheckInCard({ title = "Your attendance today" }) {
 
   const registerThisPhone = () =>
     act(async () => {
-      await confirmIdentity("Confirm it's you to register this phone");
-      // Saved before it is sent: if the answer gets lost, a retry sends the same key.
-      const key = data.deviceKey ?? makeDeviceKey();
-      await saveDeviceKey(accountId, key);
-      const device = await registerDevice(Platform.OS, key);
-      return { ...data, device: { status: device.status, platform: device.platform, thisPhone: true }, deviceKey: key };
+      registering.current = true;
+      registrations.current += 1;
+      try {
+        await confirmIdentity("Confirm it's you to register this phone");
+        // Saved before it is sent: if the answer gets lost, a retry sends the same key.
+        const key = data.deviceKey ?? makeDeviceKey();
+        await saveDeviceKey(accountId, key);
+        const device = await registerDevice(Platform.OS, key);
+        return { ...data, device: { status: device.status, platform: device.platform, thisPhone: true }, deviceKey: key };
+      } finally {
+        registering.current = false;
+        registrations.current += 1;
+      }
     });
 
   const doCheckIn = () =>

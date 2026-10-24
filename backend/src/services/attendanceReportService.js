@@ -17,13 +17,15 @@ const lastDayOfMonth = (monthKey) => {
 
 const emptyCounts = () => Object.fromEntries(COUNTED.map((status) => [status, 0]));
 
-const toEmployeeDto = ({ id, employeeId, firstName, lastName, department, position }) => ({
+// `photoUpdatedAt` lets the list show the photo.
+const toEmployeeDto = ({ id, employeeId, firstName, lastName, department, position, photoUpdatedAt }) => ({
   id,
   employeeId,
   firstName,
   lastName,
   department,
   position,
+  photoUpdatedAt,
 });
 
 // `now` is only for tests.

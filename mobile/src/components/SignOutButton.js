@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from "react-native";
 import { useAuth } from "../auth/AuthContext";
 import { colors, spacing } from "../theme";
 
-// The sign-out icon in the header of the manager and employee tabs.
+// The sign-out icon in the header of every role's tabs (HR, manager and employee).
 export default function SignOutButton() {
   const { logout } = useAuth();
   return (

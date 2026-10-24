@@ -85,14 +85,14 @@ function CorrectionSheet({ target, date, today, submitting, error, onCancel, onS
 
       <View style={styles.times}>
         <TimeField label="Check-in" value={checkIn} placeholder="09:00" onChangeText={setCheckIn} editable={!submitting} />
-        <TimeField
-          label="Check-out (optional)"
-          value={checkOut}
-          placeholder="17:00"
-          onChangeText={setCheckOut}
-          editable={!submitting}
-        />
+        <TimeField label="Check-out (optional)" value={checkOut} placeholder="17:00" onChangeText={setCheckOut} editable={!submitting} />
       </View>
+      {record.checkOut && (
+        <Text style={font.small}>
+          Left empty, the recorded check-out stays only if it is after the new check-in; otherwise the day is left
+          without one.
+        </Text>
+      )}
 
       <TextInput
         value={reason}

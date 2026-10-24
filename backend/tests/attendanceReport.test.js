@@ -136,7 +136,23 @@ describe("a month of one person", () => {
   test("shows only what HR needs of a person: no email or phone", async () => {
     const row = rowOf(await report(), anna.employeeId);
 
-    assert.deepEqual(Object.keys(row.employee).sort(), ["department", "employeeId", "firstName", "id", "lastName", "position"]);
+    assert.deepEqual(Object.keys(row.employee).sort(), [
+      "department",
+      "employeeId",
+      "firstName",
+      "id",
+      "lastName",
+      "photoUpdatedAt",
+      "position",
+    ]);
+  });
+
+  test("carries the date of a person's photo, so the list can show it", async () => {
+    const withPhoto = await person({ firstName: "Photo", photoUpdatedAt: new Date("2026-09-10T08:00:00Z") });
+    const res = await report();
+
+    assert.equal(rowOf(res, withPhoto.employeeId).employee.photoUpdatedAt, "2026-09-10T08:00:00.000Z");
+    assert.equal(rowOf(res, anna.employeeId).employee.photoUpdatedAt, null);
   });
 });
 

@@ -30,7 +30,7 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ message: "Invalid JSON in request body" });
   }
 
-  // Request body over the 100 kB limit
+  // Request body over its limit (100 kB, or 400 kB for a photo)
   if (err.type === "entity.too.large") {
     return res.status(413).json({ message: "Request body is too large" });
   }

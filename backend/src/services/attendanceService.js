@@ -29,14 +29,15 @@ const windowStart = (now) => addDays(todayKey(now), -(CORRECTION_WINDOW_DAYS - 1
 
 const coversDay = (leave, dateKey) => toDateKey(leave.startDate) <= dateKey && dateKey <= toDateKey(leave.endDate);
 
-// Only the fields the attendance screens show.
-const toEmployeeDto = ({ id, employeeId, firstName, lastName, department, position }) => ({
+// Only the fields the attendance screens show (`photoUpdatedAt` lets the list show the photo).
+const toEmployeeDto = ({ id, employeeId, firstName, lastName, department, position, photoUpdatedAt }) => ({
   id,
   employeeId,
   firstName,
   lastName,
   department,
   position,
+  photoUpdatedAt,
 });
 
 // A waiting correction matters most, then the latest approved one. `corrections` is newest first.

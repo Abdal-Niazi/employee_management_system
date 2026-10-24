@@ -119,7 +119,7 @@ export default function HrAttendanceScreen() {
             accessibilityHint={item.record.editable ? "Write or fix this day's check-in" : undefined}
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.75 }]}
           >
-            <Avatar firstName={item.employee.firstName} lastName={item.employee.lastName} size={36} />
+            <Avatar firstName={item.employee.firstName} lastName={item.employee.lastName} size={36} photoFor={item.employee} />
             <View style={styles.flex}>
               <Text style={styles.name} numberOfLines={1}>
                 {fullName(item.employee)}

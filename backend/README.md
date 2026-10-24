@@ -123,7 +123,7 @@ HR routes for it (`HR_ADMIN`):
 |---|---|
 | `GET /api/employees/:id/device` | `{ registered, device }`; device is `{ status, platform, registeredAt, approvedAt, approvedBy, lastUsedAt }` or null; `lastUsedAt` is the last check-in or check-out that went through |
 | `POST /api/employees/:id/device/approve` | `{ registeredAt }` of the phone HR looked at, required (422 without it; 409 if another one replaced it since, or it is already approved; 404 if none waits) |
-| `DELETE /api/employees/:id/device` | rejects a waiting phone, or resets a lost or replaced one; the person registers again |
+| `DELETE /api/employees/:id/device` | rejects a waiting phone, or resets a lost or replaced one; the person registers again. `?registeredAt=` (the phone HR looked at) leaves a phone that replaced it alone (409) |
 
 The employee list has `phoneStatus` (null, `PENDING` or `APPROVED`) on each employee. In the app,
 HR approves on the employee's screen (**Check-in phone**), ideally with the person and the phone in
@@ -301,7 +301,8 @@ run). The script refuses to run against `DATABASE_URL`.
 - Never run `npm run seed` there: it refuses when `NODE_ENV=production`, because it adds sample data.
 
 Built in: security headers (helmet), a CORS allow list, 100 kB JSON bodies, bcrypt passwords,
-8-hour tokens, role checks on every route, input validation with length limits, and rate limits:
+12-hour tokens (`JWT_EXPIRES_IN`, so a shift doesn't end with a sign-in; an existing `.env` that sets it
+keeps its own value), role checks on every route, input validation with length limits, and rate limits:
 10 failed sign-ins per 15 minutes per IP **and email** (so typos on one office Wi-Fi don't lock
 everyone out) plus 50 per IP for all emails together (so one address can't try a password on every
 account); 1000 API requests per minute per IP, whatever token is sent, and 300 per signed-in account,

@@ -1,4 +1,4 @@
-// Label + colour tone for every status the manager screens show.
+// Label + colour tone for every status the screens show (HR, manager and employee).
 const STATUS = {
   // Employee.status
   active: { label: "Active", tone: "success" },
