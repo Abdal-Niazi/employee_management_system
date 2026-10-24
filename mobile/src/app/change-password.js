@@ -14,7 +14,7 @@ const MAX_BYTES = 72;
 const byteLength = (text) => new TextEncoder().encode(text).length;
 
 // A password box with a show/hide eye.
-function PasswordField({ label, value, onChangeText, autoComplete, onSubmitEditing, returnKeyType }) {
+function PasswordField({ label, value, onChangeText, autoComplete, onSubmitEditing, returnKeyType, inputRef }) {
   const [shown, setShown] = useState(false);
 
   return (
@@ -22,10 +22,13 @@ function PasswordField({ label, value, onChangeText, autoComplete, onSubmitEditi
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputRow}>
         <TextInput
+          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
+          // "next" moves on to the next field and keeps the keyboard open
+          submitBehavior={returnKeyType === "next" ? "submit" : undefined}
           secureTextEntry={!shown}
           autoCapitalize="none"
           autoCorrect={false}
@@ -65,6 +68,8 @@ export default function ChangePasswordScreen() {
   // Set at once (state only after the next render), so a double tap, or Enter and a tap, sends
   // the change only once.
   const sending = useRef(false);
+  const nextField = useRef(null);
+  const repeatField = useRef(null);
 
   // Typing again clears the last message.
   const typing = (setter) => (text) => {
@@ -136,6 +141,7 @@ export default function ChangePasswordScreen() {
             onChangeText={typing(setCurrent)}
             autoComplete="current-password"
             returnKeyType="next"
+            onSubmitEditing={() => nextField.current?.focus()}
           />
           <PasswordField
             label="New password"
@@ -143,6 +149,8 @@ export default function ChangePasswordScreen() {
             onChangeText={typing(setNext)}
             autoComplete="new-password"
             returnKeyType="next"
+            inputRef={nextField}
+            onSubmitEditing={() => repeatField.current?.focus()}
           />
           <Text style={styles.hint}>At least {MIN_LENGTH} characters.</Text>
           <PasswordField
@@ -150,6 +158,7 @@ export default function ChangePasswordScreen() {
             value={repeat}
             onChangeText={typing(setRepeat)}
             autoComplete="new-password"
+            inputRef={repeatField}
             onSubmitEditing={handleSave}
             returnKeyType="done"
           />

@@ -1,8 +1,10 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
+import { AppState } from "react-native";
 
-// Loads data whenever the screen gains focus, so changes made on another tab show
-// up. Refocusing refetches quietly behind the current data (and keeps it if that fails);
+// Loads data whenever the screen gains focus, and when the app comes back to the front while the
+// screen is shown (so a phone left in the background overnight shows today, not yesterday), so
+// changes made elsewhere show up. Refocusing refetches quietly behind the current data (and keeps it if that fails);
 // passing a different `loader` (e.g. a new date) shows the loading state. Stale responses
 // are dropped.
 // `loader` must be stable: a module function or one wrapped in useCallback.
@@ -43,6 +45,10 @@ export function useAsync(loader) {
   useFocusEffect(
     useCallback(() => {
       run();
+      const subscription = AppState.addEventListener("change", (next) => {
+        if (next === "active") run();
+      });
+      return () => subscription.remove();
     }, [run])
   );
 

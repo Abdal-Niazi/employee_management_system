@@ -52,6 +52,8 @@ export default function LeaveScreen() {
       revalidate();
     } catch (e) {
       setDecisionError(e.message);
+      // Already decided (by HR or on another phone): show the list as it is now
+      if (e.status === 409) revalidate();
     } finally {
       setSubmitting(false);
     }
