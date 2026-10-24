@@ -81,7 +81,8 @@ const verifyDevice = async (employee, key) => {
 };
 
 // After a check-in or check-out went through (not a refused one), so HR sees when it was last used.
-const markUsed = (device) => prisma.registeredDevice.update({ where: { id: device.id }, data: { lastUsedAt: new Date() } });
+// updateMany, so a phone HR reset a moment ago doesn't turn a saved check-in into an error.
+const markUsed = (device) => prisma.registeredDevice.updateMany({ where: { id: device.id }, data: { lastUsedAt: new Date() } });
 
 // HR: lets the waiting phone HR looked at (registered at `registeredAt`) check in. Checked in the
 // same statement as the change, so it can't approve a phone that was just reset or replaced.
@@ -102,9 +103,15 @@ const approveDevice = async (employeeId, adminId, registeredAt) => {
 };
 
 // HR: rejects a waiting phone, or forgets a lost or replaced one, so the person can register again.
-const resetDevice = async (employeeId) => {
-  const { count } = await prisma.registeredDevice.deleteMany({ where: { employeeId } });
+// With `registeredAt` (the phone HR looked at) only that phone goes, checked in the same statement.
+const resetDevice = async (employeeId, registeredAt) => {
+  const { count } = await prisma.registeredDevice.deleteMany({
+    where: { employeeId, ...(registeredAt && { createdAt: new Date(registeredAt) }) },
+  });
   if (count === 0) {
+    if (registeredAt && (await getDevice(employeeId))) {
+      throw new AppError("The phone changed since you opened this screen. Check it again.", 409);
+    }
     throw new AppError("This employee has no registered phone", 404);
   }
 };

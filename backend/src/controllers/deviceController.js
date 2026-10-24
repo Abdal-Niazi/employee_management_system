@@ -1,5 +1,6 @@
 const deviceService = require("../services/deviceService");
 const findEmployee = require("../utils/requestEmployee");
+const { resetDeviceQuerySchema } = require("../validators/deviceSchema");
 
 // HR: whether an employee has a registered phone, and when it was last used. The key never leaves.
 const getDevice = async (req, res) => {
@@ -27,7 +28,8 @@ const approveDevice = async (req, res) => {
 // HR: reject a waiting phone, or forget a lost or replaced one, so the person can register again.
 const resetDevice = async (req, res) => {
   const employee = await findEmployee(req);
-  await deviceService.resetDevice(employee.id);
+  const { registeredAt } = resetDeviceQuerySchema.parse(req.query);
+  await deviceService.resetDevice(employee.id, registeredAt);
 
   res.status(200).json({
     message: "Registered phone reset",

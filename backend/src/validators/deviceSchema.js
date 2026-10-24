@@ -15,4 +15,11 @@ const approveDeviceSchema = z.object({
   registeredAt: z.iso.datetime({ error: "registeredAt must be the date and time of the phone you looked at" }),
 });
 
-module.exports = { registerDeviceSchema, approveDeviceSchema };
+// Query of DELETE /api/employees/:id/device. `registeredAt` is optional (the reset-device script
+// forgets whatever phone is there); the app sends it, so a reject or reset never removes a phone
+// that was registered or approved after HR looked.
+const resetDeviceQuerySchema = z.object({
+  registeredAt: z.iso.datetime({ error: "registeredAt must be the date and time of the phone you looked at" }).optional(),
+});
+
+module.exports = { registerDeviceSchema, approveDeviceSchema, resetDeviceQuerySchema };

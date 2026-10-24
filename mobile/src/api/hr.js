@@ -51,8 +51,9 @@ export async function approveEmployeeDevice(id, registeredAt) {
 }
 
 // Rejects a waiting phone, or forgets a lost or replaced one, so the person can register again.
-export async function resetEmployeeDevice(id) {
-  await request(`/api/employees/${id}/device`, { method: "DELETE" });
+// registeredAt is the phone HR looked at: one registered or approved since then is left alone.
+export async function resetEmployeeDevice(id, registeredAt) {
+  await request(`/api/employees/${id}/device?registeredAt=${encodeURIComponent(registeredAt)}`, { method: "DELETE" });
 }
 
 // An employee's photo: a JPEG as base64 text (cut to a square and shrunk first, see utils/pickPhoto)

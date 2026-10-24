@@ -38,12 +38,14 @@ if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PRO
 
 app.use(helmet());
 app.use(cors(corsOptions));
-// A photo is sent as base64 text and is bigger than any other request: its own, larger limit, set
-// before the general one (which skips a body that is already read).
-app.use("/api/photos", express.json({ limit: "400kb" }));
-app.use(express.json({ limit: "100kb" }));
-
+// Counted before any body is read, so requests over the limit cost the server almost nothing.
 app.use("/api", addressLimiter);
+// A photo is sent as base64 text and is bigger than any other request: its own, larger limit, set
+// before the general one (which skips a body that is already read). The app never compresses a
+// body, so compressed ones are refused (inflate: false): unpacking them is a known way to stall a server.
+app.use("/api/photos", express.json({ limit: "400kb", inflate: false }));
+app.use(express.json({ limit: "100kb", inflate: false }));
+
 app.use("/api/auth/login", loginLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);

@@ -181,4 +181,20 @@ describe("registered phones", () => {
     assert.equal((await request(app).delete(deviceUrl(data.a1.id)).set(hr)).status, 200);
     assert.equal((await today(employee)).body.device, null);
   });
+
+  test("a reset can name the phone HR looked at, and then leaves one that replaced it", async () => {
+    assert.equal((await register(employee)).status, 201);
+    const { registeredAt } = (await request(app).get(deviceUrl(data.a1.id)).set(hr)).body.device;
+
+    const stale = await request(app).delete(`${deviceUrl(data.a1.id)}?registeredAt=2020-01-01T00:00:00.000Z`).set(hr);
+    assert.equal(stale.status, 409);
+    assert.match(stale.body.message, /changed/);
+    assert.ok((await today(employee)).body.device);
+
+    assert.equal((await request(app).delete(`${deviceUrl(data.a1.id)}?registeredAt=yesterday`).set(hr)).status, 422);
+
+    const res = await request(app).delete(`${deviceUrl(data.a1.id)}?registeredAt=${encodeURIComponent(registeredAt)}`).set(hr);
+    assert.equal(res.status, 200);
+    assert.equal((await today(employee)).body.device, null);
+  });
 });

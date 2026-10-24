@@ -64,7 +64,7 @@ export default function PhoneCard({ employeeId, name }) {
     setBusy(true);
     try {
       if (asking === "approve") await approveEmployeeDevice(employeeId, device.registeredAt);
-      else await resetEmployeeDevice(employeeId);
+      else await resetEmployeeDevice(employeeId, device.registeredAt);
       setCardError("");
     } catch (err) {
       setCardError(err.message);

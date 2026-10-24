@@ -54,6 +54,19 @@ describe("setting a photo", () => {
     assert.ok(list.every((e) => !("photo" in e) && !("data" in e)));
   });
 
+  test("the attendance day of a manager and of HR carries the date too", async () => {
+    for (const [url, headers] of [
+      ["/api/manager/attendance?date=2026-03-10", managerA],
+      ["/api/attendance?date=2026-03-10", hr],
+    ]) {
+      const rows = (await request(app).get(url).set(headers)).body.rows;
+      const employeeOf = (id) => rows.find((row) => row.employee.id === id).employee;
+
+      assert.ok(employeeOf(data.a1.id).photoUpdatedAt, url);
+      assert.equal(employeeOf(data.a2.id).photoUpdatedAt, null, url);
+    }
+  });
+
   test("a new photo replaces the old one and moves the date on", async () => {
     const before = (await request(app).get(`/api/employees/${data.a1.id}`).set(hr)).body.employee.photoUpdatedAt;
     await new Promise((resolve) => setTimeout(resolve, 15));
