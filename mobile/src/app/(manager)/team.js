@@ -22,7 +22,12 @@ function MemberRow({ employee, onPress }) {
   const role = [employee.position, employee.department].filter(Boolean).join(" · ");
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && { opacity: 0.75 }]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityHint="Opens their details"
+      style={({ pressed }) => [styles.row, pressed && { opacity: 0.75 }]}
+    >
       <Avatar firstName={employee.firstName} lastName={employee.lastName} photoFor={employee} />
       <View style={styles.rowText}>
         <Text style={styles.name} numberOfLines={1}>
