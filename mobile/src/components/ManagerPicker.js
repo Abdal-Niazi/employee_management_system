@@ -41,6 +41,9 @@ export default function ManagerPicker({ value, options, onChange }) {
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => choose(item.id)}
+                  // The checkmark only shows the chosen one to the eye, so a screen reader is told too
+                  accessibilityRole="button"
+                  aria-selected={item.id === value}
                   style={({ pressed }) => [styles.option, pressed && { opacity: 0.6 }]}
                 >
                   {item.id === null ? (
