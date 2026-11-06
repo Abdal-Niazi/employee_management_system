@@ -15,11 +15,15 @@ import { formatDay } from "../../utils/date";
 
 const BREAKDOWN = ["PRESENT", "LATE", "ABSENT", "ON_LEAVE", "NOT_IN"];
 
-function Stat({ icon, label, value, onPress }) {
+function Stat({ icon, label, value, onPress, hint }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={!onPress}
+      // Screen readers say "Team members, 4, button" and where a tap goes.
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={`${label}, ${value}`}
+      accessibilityHint={hint}
       style={({ pressed }) => [styles.stat, pressed && { opacity: 0.8 }]}
     >
       <View style={styles.statIcon}>
@@ -59,20 +63,34 @@ export default function OverviewScreen() {
       <CheckInCard />
 
       <View style={styles.stats}>
-        <Stat icon="people-outline" label="Team members" value={teamSize} onPress={() => router.navigate("/team")} />
+        <Stat
+          icon="people-outline"
+          label="Team members"
+          value={teamSize}
+          onPress={() => router.navigate("/team")}
+          hint="Opens your team"
+        />
         <Stat
           icon="checkmark-circle-outline"
           label="Checked in today"
           value={workday ? `${checkedIn}/${expected}` : String(checkedIn)}
           onPress={() => router.navigate("/attendance")}
+          hint="Opens attendance"
         />
         <Stat
           icon="alarm-outline"
           label="Late today"
           value={workday ? counts.LATE : "—"}
           onPress={() => router.navigate("/attendance")}
+          hint="Opens attendance"
         />
-        <Stat icon="hourglass-outline" label="Pending leave" value={pending.length} onPress={() => router.navigate("/leave")} />
+        <Stat
+          icon="hourglass-outline"
+          label="Pending leave"
+          value={pending.length}
+          onPress={() => router.navigate("/leave")}
+          hint="Opens leave requests"
+        />
       </View>
 
       <Card title="Today's attendance">
@@ -102,6 +120,8 @@ export default function OverviewScreen() {
               <Pressable
                 key={request.id}
                 onPress={() => router.navigate("/leave")}
+                accessibilityRole="button"
+                accessibilityHint="Opens leave requests"
                 style={({ pressed }) => [styles.pendingRow, pressed && { opacity: 0.7 }]}
               >
                 <View style={styles.flex}>
